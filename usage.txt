@@ -1,4 +1,4 @@
-Main Wiki: http://code.google.com/p/mft2csv/wiki/mft2csv
+Original Wiki: http://code.google.com/p/mft2csv/wiki/mft2csv
 
 Usage scenarios:
 
@@ -10,6 +10,7 @@ Select if fixups should be skipped or not. Default to off. Usually only applicab
 Select if $MFT should be treated as broken. Default to off. Only applicable when using $MFT file as input. Should be used when fragments of $MFT is used and  $MFT is not in the first record.
 Select if resident data should be extracted. Default to off. Require to select the path to extract to.
 Select format of decoded timestamps, as well as the precision (None, MilliSec, NanoSec). Examples are displayed in GUI. Choose if extra timestamps are to be dumped to a seperate csv by ticking off "split csv".
+Select if UNICODE or ANSI. Default is ANSI output.
 
 1. Parsing $MFT on the systemdrive from your running live system.
 Detected NTFS volumes will be displayed in the second combobox from the top. If new drive is attached or mounted, click "Rescan Mounted Drives". Select target volume in the second combo.
