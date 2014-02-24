@@ -3,7 +3,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.15
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.16
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -35,24 +35,24 @@ Global $FN_ParentRefNo, $FN_ParentSeqNo, $FN_ParentRefNo_2, $FN_ParentSeqNo_2, $
 Global $DT_LengthOfAttribute, $DT_OffsetToAttribute, $DT_IndexedFlag, $DT_LengthOfAttribute_2, $DT_OffsetToAttribute_2, $DT_IndexedFlag_2, $DT_LengthOfAttribute_3, $DT_OffsetToAttribute_3, $DT_IndexedFlag_3
 Global $hFile, $nBytes, $MSecTest, $CTimeTest, $SI_MaxVersions, $SI_VersionNumber, $SI_ClassID, $SI_OwnerID, $SI_SecurityID, $SI_HEADER_Flags, $SI_ON, $AL_ON, $FN_ON, $OI_ON, $SD_ON, $VN_ON, $VI_ON, $DT_ON, $IR_ON, $IA_ON, $BITMAP_ON, $RP_ON, $EAI_ON, $EA_ON, $PS_ON, $LUS_ON
 Global $GUID_ObjectID, $GUID_BirthVolumeID, $GUID_BirthObjectID, $GUID_BirthDomainID, $VOLUME_NAME_NAME, $VOL_INFO_NTFS_VERSION, $VOL_INFO_FLAGS, $INV_FNAME, $INV_FNAME_2, $INV_FNAME_3, $DT_Number
-Global $FileSizeBytes, $IntegrityCheck, $ComboPhysicalDrives, $IsPhysicalDrive=False,$GlobalRefCounter=0,$IsShadowCopy=False
+Global $FileSizeBytes, $IntegrityCheck, $ComboPhysicalDrives, $IsPhysicalDrive=False,$GlobalRefCounter=0,$IsShadowCopy=False,$EncodingWhenOpen=2
 Global Const $RecordSignatureBad = '42414144' ; BAAD signature
-Global Const $STANDARD_INFORMATION = '10000000'; Standard Information
+Global Const $STANDARD_INFORMATION = '10000000'
 Global Const $ATTRIBUTE_LIST = '20000000'
-Global Const $FILE_NAME = '30000000' ; File Name
-Global Const $OBJECT_ID = '40000000' ; Object ID
+Global Const $FILE_NAME = '30000000'
+Global Const $OBJECT_ID = '40000000'
 Global Const $SECURITY_DESCRIPTOR = '50000000'
 Global Const $VOLUME_NAME = '60000000'
 Global Const $VOLUME_INFORMATION = '70000000'
-Global Const $DATA = '80000000' ; Data
-Global Const $INDEX_ROOT = '90000000' ; Index Root
-Global Const $INDEX_ALLOCATION = 'A0000000' ; Index Allocation
-Global Const $BITMAP = 'B0000000' ; Bitmap
+Global Const $DATA = '80000000'
+Global Const $INDEX_ROOT = '90000000'
+Global Const $INDEX_ALLOCATION = 'A0000000'
+Global Const $BITMAP = 'B0000000'
 Global Const $REPARSE_POINT = 'C0000000'
 Global Const $EA_INFORMATION = 'D0000000'
 Global Const $EA = 'E0000000'
 Global Const $PROPERTY_SET = 'F0000000'
-Global Const $LOGGED_UTILITY_STREAM = '00010000'; 0x100
+Global Const $LOGGED_UTILITY_STREAM = '00010000'
 Global Const $ATTRIBUTE_END_MARKER = 'FFFFFFFF'
 Global Const $ATTRIB_HEADER_FLAG_COMPRESSED = 0x0001
 Global Const $ATTRIB_HEADER_FLAG_ENCRYPTED = 0x4000
@@ -105,7 +105,7 @@ Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
 
-$Form = GUICreate("MFT2CSV 2.0.0.15", 560, 450, -1, -1)
+$Form = GUICreate("MFT2CSV 2.0.0.16", 560, 450, -1, -1)
 GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
 
 $Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
@@ -146,6 +146,8 @@ $SaparatorInput2 = GUICtrlCreateInput($separator,120,135,30,20)
 GUICtrlSetState($SaparatorInput2, $GUI_DISABLE)
 $checkquotes = GUICtrlCreateCheckbox("Quotation mark", 170, 135, 100, 20)
 GUICtrlSetState($checkquotes, $GUI_UNCHECKED)
+$CheckUnicode = GUICtrlCreateCheckbox("Unicode", 280, 135, 60, 20)
+GUICtrlSetState($CheckUnicode, $GUI_UNCHECKED)
 $LabelTimestampFormat = GUICtrlCreateLabel("Timestamp format:",20,168,90,20)
 $ComboTimestampFormat = GUICtrlCreateCombo("", 110, 168, 30, 25)
 $LabelTimestampPrecision = GUICtrlCreateLabel("Precision:",150,168,50,20)
@@ -154,7 +156,7 @@ $CheckCsvSplit = GUICtrlCreateCheckbox("split csv", 280, 168, 60, 20)
 GUICtrlSetState($CheckCsvSplit, $GUI_UNCHECKED)
 $InputExampleTimestamp = GUICtrlCreateInput("",350,168,200,20)
 GUICtrlSetState($InputExampleTimestamp, $GUI_DISABLE)
-$myctredit = GUICtrlCreateEdit("Extracting files from NTFS formatted volume" & @CRLF, 0, 195, 560, 85, $ES_AUTOVSCROLL + $WS_VSCROLL)
+$myctredit = GUICtrlCreateEdit("Decoding $MFT" & @CRLF, 0, 195, 560, 85, BitAND($ES_AUTOVSCROLL,$WS_VSCROLL))
 _GetPhysicalDrives("PhysicalDrive")
 _GetMountedDrivesInfo()
 _InjectTimeZoneInfo()
@@ -180,7 +182,7 @@ EndIf
 $tDelta = $tDelta*-1 ;Since delta is substracted from timestamp later on
 
 $TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
-$logfile = FileOpen(@ScriptDir & "\" & $TimestampStart & ".log",2)
+$logfile = FileOpen(@ScriptDir & "\" & $TimestampStart & ".log",2+32)
 $subset = 0
 
 Select
@@ -287,6 +289,13 @@ Func _ExtractSystemfile()
 	Local $nBytes
 	Global $DataQ[1], $RUN_VCN[1], $RUN_Clusters[1]
 	$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
+	If GUICtrlRead($CheckUnicode) = 1 Then
+		$EncodingWhenOpen = 2+32
+		_DebugOut("UNICODE configured")
+	Else
+		$EncodingWhenOpen = 2
+		_DebugOut("ANSI configured")
+	EndIf
 	_SelectCsv()
 	_TranslateTimestamp()
 	If Int(GUICtrlRead($checkl2t) + GUICtrlRead($checkbodyfile) + GUICtrlRead($checkdefaultall)) <> 9 Then
@@ -2777,7 +2786,7 @@ EndFunc
 
 Func _SelectCsv()
 	$csvfile = @ScriptDir&"\MftDump_"&$TimestampStart&".csv"
-	$csv = FileOpen($csvfile, 2)
+	$csv = FileOpen($csvfile, $EncodingWhenOpen)
 	If @error Then Return
 	_DisplayInfo("Output CSV file: " & $csvfile & @CRLF)
 	_DebugOut("Output CSV file: " & $csvfile)
