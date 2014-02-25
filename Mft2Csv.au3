@@ -3,7 +3,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.16
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.17
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -105,7 +105,7 @@ Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
 
-$Form = GUICreate("MFT2CSV 2.0.0.16", 560, 450, -1, -1)
+$Form = GUICreate("MFT2CSV 2.0.0.17", 560, 450, -1, -1)
 GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
 
 $Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
@@ -538,7 +538,7 @@ Func _DoFileTree()
 					If $NameSpace <> "02" Then
 						$NameLength = Dec(StringMid($attr,177,2))
 						$FileName = StringMid($attr,181,$NameLength*4)
-						$FileName = _UnicodeHexToStr($FileName)
+						$FileName = BinaryToString("0x"&$FileName,2)
 						If Not BitAND($Flags,Dec("0100")) Then $FileName = "[DEL" & $ref & "]" & $FileName     ;deleted record
 						$FileTree[$FileRef] &= "**" & $ParentRef & "*" & $FileName
 					EndIf
@@ -547,9 +547,9 @@ Func _DoFileTree()
 					$PrintNameOffset = Dec(_SwapEndian(StringMid($record,$Offset+72,4)),2)
 					$PrintNameLength = Dec(_SwapEndian(StringMid($record,$Offset+76,4)),2)
 					If $tag = "030000A0" Then	;JUNCTION
-						$PrintName = _UnicodeHexToStr(StringMid($record, $Offset+80+$PrintNameOffset*2, $PrintNameLength*2))
+						$PrintName = BinaryToString("0x"&StringMid($record, $Offset+80+$PrintNameOffset*2, $PrintNameLength*2),2)
 					ElseIf $tag = "0C0000A0" Then	;SYMLINKD
-						$PrintName = _UnicodeHexToStr(StringMid($record, $Offset+80+$PrintNameOffset*2+8, $PrintNameLength*2))
+						$PrintName = BinaryToString("0x"&StringMid($record, $Offset+80+$PrintNameOffset*2+8, $PrintNameLength*2),2)
 					Else
 						_DebugOut($ref & " Unhandled Reparse Tag: " & $tag, $record)
 					EndIf
@@ -693,7 +693,7 @@ Func _DecodeDataQEntry($attr)		;processes data attribute
    $NameLength = Dec(StringMid($attr,19,2))
    $NameOffset = Dec(_SwapEndian(StringMid($attr,21,4)))
    If $NameLength > 0 Then		;must be ADS
-	  $ADS_Name = _UnicodeHexToStr(StringMid($attr,$NameOffset*2 + 1,$NameLength*4))
+	  $ADS_Name = BinaryToString("0x"&StringMid($attr,$NameOffset*2 + 1,$NameLength*4),2)
 	  $ADS_Name = $FN_Name & "[ADS_" & $ADS_Name & "]"
    Else
 	  $ADS_Name = $FN_Name		;need to preserve $FN_Name
@@ -765,7 +765,7 @@ Func _DecodeMFTRecord($record, $FileRef)      ;produces DataQ
 			If $NameSpace <> "02" Then
 				$NameLength = Dec(StringMid($attr,177,2))
 				$FileName = StringMid($attr,181,$NameLength*4)
-				$FileName = _UnicodeHexToStr($FileName)
+				$FileName = BinaryToString("0x"&$FileName,2)
 				If Not BitAND($Flags,Dec("0100")) Then $FileName = "[DEL]" & $FileName     ;deleted record
 				Global $FN_Name = $FileName
 			EndIf
@@ -882,14 +882,6 @@ EndFunc
 
 Func _SwapEndian($iHex)
    Return StringMid(Binary(Dec($iHex,2)),3, StringLen($iHex))
-EndFunc
-
-Func _UnicodeHexToStr($FileName)
-   $str = ""
-   For $i = 1 To StringLen($FileName) Step 4
-	  $str &= ChrW(Dec(_SwapEndian(StringMid($FileName, $i, 4))))
-   Next
-   Return $str
 EndFunc
 
 Func _DebugOut($text, $var="")
@@ -1539,8 +1531,8 @@ Func _Get_FileName($MFTEntry, $FN_Offset, $FN_Size, $FN_Number)
 				$FN_NameType = 'UNKNOWN'
 		EndSelect
 		$FN_NameSpace = $FN_NameLen - 1 ;Not really
-		$FN_Name = StringMid($MFTEntry, $FN_Offset + 180, ($FN_NameLen + $FN_NameSpace) * 2)
-		$FN_Name = _UnicodeHexToStr($FN_Name)
+		$FN_Name = StringMid($MFTEntry, $FN_Offset + 180, $FN_NameLen*4)
+		$FN_Name = BinaryToString("0x"&$FN_Name,2)
 	EndIf
 	If $FN_Number = 2 Then
 		$FN_ParentRefNo_2 = StringMid($MFTEntry, $FN_Offset + 48, 12)
@@ -1659,8 +1651,8 @@ Func _Get_FileName($MFTEntry, $FN_Offset, $FN_Size, $FN_Number)
 				$FN_NameType_2 = 'UNKNOWN'
 		EndSelect
 		$FN_NameSpace_2 = $FN_NameLen_2 - 1 ;Not really
-		$FN_Name_2 = StringMid($MFTEntry, $FN_Offset + 180, ($FN_NameLen_2 + $FN_NameSpace_2) * 2)
-		$FN_Name_2 = _UnicodeHexToStr($FN_Name_2)
+		$FN_Name_2 = StringMid($MFTEntry, $FN_Offset + 180, $FN_NameLen_2*4)
+		$FN_Name_2 = BinaryToString("0x"&$FN_Name_2,2)
 	EndIf
 	If Not $DoDefaultAll Then Return
 	If $FN_Number = 3 Then
@@ -1780,8 +1772,8 @@ Func _Get_FileName($MFTEntry, $FN_Offset, $FN_Size, $FN_Number)
 				$FN_NameType_3 = 'UNKNOWN'
 		EndSelect
 		$FN_NameSpace_3 = $FN_NameLen_3 - 1 ;Not really
-		$FN_Name_3 = StringMid($MFTEntry, $FN_Offset + 180, ($FN_NameLen_3 + $FN_NameSpace_3) * 2)
-		$FN_Name_3 = _UnicodeHexToStr($FN_Name_3)
+		$FN_Name_3 = StringMid($MFTEntry, $FN_Offset + 180, $FN_NameLen_3*4)
+		$FN_Name_3 = BinaryToString("0x"&$FN_Name_3,2)
 	EndIf
 	Return
 EndFunc   ;==>_Get_FileName
@@ -1827,7 +1819,7 @@ EndFunc   ;==>_Get_SecurityDescriptor
 Func _Get_VolumeName($MFTEntry, $VOLUME_NAME_Offset, $VOLUME_NAME_Size)
 	If $VOLUME_NAME_Size - 24 > 0 Then
 		$VOLUME_NAME_NAME = StringMid($MFTEntry, $VOLUME_NAME_Offset + 48, ($VOLUME_NAME_Size - 24) * 2)
-		$VOLUME_NAME_NAME = _UnicodeHexToStr($VOLUME_NAME_NAME)
+		$VOLUME_NAME_NAME = BinaryToString("0x"&$VOLUME_NAME_NAME,2)
 		Return
 	EndIf
 	$VOLUME_NAME_NAME = "EMPTY"
@@ -1853,8 +1845,8 @@ Func _Get_Data($MFTEntry, $DT_Offset, $DT_Size, $DT_Number)
 		$DT_Flags = _AttribHeaderFlags("0x" & $DT_Flags)
 		If $DT_NameLength > 0 Then
 			$DT_NameSpace = $DT_NameLength - 1
-			$DT_Name = StringMid($MFTEntry, $DT_Offset + ($DT_NameRelativeOffset * 2), ($DT_NameLength + $DT_NameSpace) * 2)
-			$DT_Name = _UnicodeHexToStr($DT_Name)
+			$DT_Name = StringMid($MFTEntry, $DT_Offset + ($DT_NameRelativeOffset * 2), $DT_NameLength*4)
+			$DT_Name = BinaryToString("0x"&$DT_Name,2)
 		EndIf
 		If $DT_NonResidentFlag = '01' Then
 			$DT_StartVCN = StringMid($MFTEntry, $DT_Offset + 32, 16)
@@ -1890,8 +1882,8 @@ Func _Get_Data($MFTEntry, $DT_Offset, $DT_Size, $DT_Number)
 		$DT_Flags_2 = _AttribHeaderFlags("0x" & $DT_Flags_2)
 		If $DT_NameLength_2 > 0 Then
 			$DT_NameSpace_2 = $DT_NameLength_2 - 1
-			$DT_Name_2 = StringMid($MFTEntry, $DT_Offset + ($DT_NameRelativeOffset_2 * 2), ($DT_NameLength_2 + $DT_NameSpace_2) * 2)
-			$DT_Name_2 = _UnicodeHexToStr($DT_Name_2)
+			$DT_Name_2 = StringMid($MFTEntry, $DT_Offset + ($DT_NameRelativeOffset_2 * 2), $DT_NameLength_2*4)
+			$DT_Name_2 = BinaryToString("0x"&$DT_Name_2,2)
 		EndIf
 		If $DT_NonResidentFlag_2 = '01' Then
 			$DT_StartVCN_2 = StringMid($MFTEntry, $DT_Offset + 32, 16)
@@ -1925,8 +1917,8 @@ Func _Get_Data($MFTEntry, $DT_Offset, $DT_Size, $DT_Number)
 		$DT_Flags_3 = _AttribHeaderFlags("0x" & $DT_Flags_3)
 		If $DT_NameLength_3 > 0 Then
 			$DT_NameSpace_3 = $DT_NameLength_3 - 1
-			$DT_Name_3 = StringMid($MFTEntry, $DT_Offset + ($DT_NameRelativeOffset_3 * 2), ($DT_NameLength_3 + $DT_NameSpace_3) * 2)
-			$DT_Name_3 = _UnicodeHexToStr($DT_Name_3)
+			$DT_Name_3 = StringMid($MFTEntry, $DT_Offset + ($DT_NameRelativeOffset_3 * 2), $DT_NameLength_3*4)
+			$DT_Name_3 = BinaryToString("0x"&$DT_Name_3,2)
 		EndIf
 		If $DT_NonResidentFlag_3 = '01' Then
 			$DT_StartVCN_3 = StringMid($MFTEntry, $DT_Offset + 32, 16)
