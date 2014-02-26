@@ -1,0 +1,62 @@
+Mft2Csv changelog
+
+v2.0.0.17. Fixed a unicode related bug that caused the last character to be incorrect when the character was of 2 bytes.
+
+v2.0.0.16. Added unicode support.
+
+v2.0.0.15. Fixed a bug where file paths for certain deleted objects got wrong. Only source of the latest version is available at this site now, since google code don't support new downloads. Binaries will be available again soon, when project is moved somewhere else. 
+
+v2.0.0.13. Fixed bug that prevented single records containing $ATTRIBUTE_LIST (Broken $MFT configured) to be decoded.
+
+v2.0.0.12. Added support for parsing $MFT directly from within shadow copies. Fixed tiny bug that caused FilePath to have 1 erronous character prefixed for all values.
+
+v2.0.0.11. Fixed bug when handling old NT Style records. Added separate variable to indicate the old NT Style recordss, and put a predicted MFT ref into the original MFT record number variable. Added options to specify timestamp formats and level of precision. Was added for easier working/sorting of data in spreadsheets. Added sample output in gui to show what the timestamp format would look like. All timestamp variables are now split into 3. 1 original, and then 1 core containing the timestamp without precision, and 1 timestamp precision variable conatining only the precision depending on the configuration chosen (None, MilliSec, or MilliSec+NanoSec). Added an option to dump these new split timestamp variables to a separate csv, by ticking off the "split csv" option. Removed option to set csv, and replaced with a standard one in current directory identified with a timestamp in the csv file name.
+
+v2.0.0.10. Fixed bug when resolving certain filepaths from an extracted MFT file, when MFT had been fragmented. Changed default separator to | (pipe), which is invalid for filenames. Removed quotes on as default. Removed annoying UTC comment information at the top of csv.
+
+v2.0.0.8. Fixed a bug that caused file paths to be resolved incorrectly with certain fragmented MFT's. Slightly changed how the header flags are interpreted. Added support for accessing \\PhysicalDriveN directly, and thus removed any requirement for having volumes mounted.
+
+v2.0.0.7. Fixed incorrect default value for Bytes Per Cluster when using $MFT file as input (caused some crashes).
+
+v2.0.0.6. Fixed bug when handling attribute lists and broken $MFT file as input.
+
+v2.0.0.5. Added functionality to optionally extract all resident data.
+
+v2.0.0.4. Added functionality to parse broken $MFT. Added option to skip fixups.
+
+v2.0.0.3. Fixed crash on certain MFT's with specific invalid records. Added option to choose separator, and if surrounding quotes. Removed decode of filename attribute number 4, as well as the invalid name variable.
+
+v2.0.0.2. Speed improvement by 30 %. Fixed bug where some columns was missing in csv with the All format.
+
+v2.0.0.1. Added support for choosing output format (all/default, log2timeline, bodyfile)
+
+v2.0.0.0. Fixed bug that caused csv to be messed up when there where commas in filename. New features include support disk and partition images, live system analysis, logfile writer, nicer gui, paths resolved, option to choose any UTC region.
+
+v1.0.0.10. Fixed old NT style records to reflect the text "NT style" in place of MFT reference.
+
+v1.9. Added decode of hardlinks as specified in the record header. Corrected base record to properly reflect 6 bytes, and added new variable as base record sequence number for the last 2 bytes of this 8 byte MFT base reference. Fixed the HEADER_LSN and SI_USN to be specified in decimal (consistent views in Excel). Fixed missing clearing of 9 global variables.
+
+v1.8. Changed the progress updating to use AdlibRegister, which increase performance.
+
+v1.7. Removed the record slack option as it was not working. Fixed compilation issues on recent AutoIt version. Fixups was implemented in the previous version I believe.
+
+v1.5 Changed record signature detection to:
+
+46494C45 = GOOD (although FILE is strictly speaking the correct one)
+44414142 = BAAD
+00000000 = ZERO
+all other = UNKNOWN
+
+Added header flag interpretation:
+0x9 = FILE+INDEX_SECURITY (ALLOCATED)
+0xD = FILE+INDEX_OTHER (ALLOCATED)
+
+Fixed crash on decoding of certain corrupt $MFT, by skipping decode of those records.
+
+v1.4 Fixed a bug in the record signature evaluation. Added csv entry for record signature evaluation. Added record integrity check by comparing the Update Sequence number to the record page end markers (2 bytes at 2 places). Some other cosmetic changes.
+
+v1.3 Added nanoseconds to the datetime variables. Changed default datetime format to "YYYY-MM-DD HH:MM:SS:MSMSMS:NSNSNSNS". MSecTest changed to evaluate the last 7 digits (msec + nsec). 64-bit support.
+
+v1.2 Fixed timestamps where a 0 was erronously put in before the milliseconds. Modified version Ascend4nt's (_WinTimeFunctions1.au3) UDF is attached (where the error originated from). Also added an option to choose before processing whether to set timestamps in UTC or local time.
+
+v1.1. Fixed a mixup of ContinueLoop with ContinueCase in the main record processing loop. The error lead to an infinite loop when ADS was more than 3 or $FILE_NAME more than 4 per file. Added a new variable to the csv as the file size (FileSizeBytes). Basically it is the $DATA size, but I thought it was better to have the file size put into one place instead of spread across two (resident vs non-resident). This is only for the first $DATA attribute.
