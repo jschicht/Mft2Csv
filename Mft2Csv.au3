@@ -1,17 +1,18 @@
 #RequireAdmin
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
-#AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.17
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.18
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
-;#include <array.au3>
-#Include <WinAPIEx.au3> ; http://www.autoitscript.com/forum/topic/98712-winapiex-udf/
+#Include <WinAPIEx.au3>
 #include <String.au3>
 #include <Date.au3>
 
+; https://github.com/jschicht
+; http://code.google.com/p/mft2csv/
+;
 ; by Joakim Schicht & Ddan
 ; parts by trancexxx, Ascend4nt & others
 
@@ -105,7 +106,7 @@ Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
 
-$Form = GUICreate("MFT2CSV 2.0.0.17", 560, 450, -1, -1)
+$Form = GUICreate("MFT2CSV 2.0.0.18", 560, 450, -1, -1)
 GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
 
 $Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
@@ -244,6 +245,7 @@ Func _HandleEvent()
 				_SelectMftFile()
 				$IsMftFile = True
 				$IsImage = False
+				$MFT_Record_Size = InputBox("Set record size","$MFT record size (1024,4096)",1024)
 ;			Case $buttonOutput
 ;				_SelectCsv()
 			Case $buttonStart
@@ -501,7 +503,8 @@ Func _DoFileTree()
 			$Pos = $MFT_RUN_VCN[$r]*$BytesPerCluster
 			_WinAPI_SetFilePointerEx($hDisk, $ImageOffset+$Pos, $FILE_BEGIN)
 		Else
-			$Pos = $testvar*1024
+			;$Pos = $testvar*1024
+			$Pos = $testvar*$MFT_Record_Size
 		EndIf
 		For $i = 0 To $MFT_RUN_Clusters[$r]*$BytesPerCluster-$MFT_Record_Size Step $MFT_Record_Size
 			$ref += 1
@@ -722,7 +725,7 @@ Func _DecodeMFTRecord($record, $FileRef)      ;produces DataQ
 	While 1		;only want Attribute List and Data Attributes
 		$Type = Dec(_SwapEndian(StringMid($record,$AttributeOffset,8)),2)
 		If $Type = 0 Or $Type > 256 Then ExitLoop		;attributes may not be in numerical order
-		If $AttributeOffset > 2040 Then Exitloop
+		If $MFT_Record_Size = 1024 And $AttributeOffset > 2040 Then Exitloop
 		$Flags = Dec(StringMid($record,47,4))
 		$AttributeSize = Dec(_SwapEndian(StringMid($record,$AttributeOffset+8,8)),2)
 		If $Type = 32 And $MftIsBroken = 0 Then
@@ -784,19 +787,45 @@ Func _DecodeMFTRecord($record, $FileRef)      ;produces DataQ
 EndFunc
 
 Func _DoFixup($record, $FileRef)		;handles NT and XP style
-   $UpdSeqArrOffset = Dec(_SwapEndian(StringMid($record,11,4)))
-   $UpdSeqArrSize = Dec(_SwapEndian(StringMid($record,15,4)))
-   $UpdSeqArr = StringMid($record,3+($UpdSeqArrOffset*2),$UpdSeqArrSize*2*2)
-   $UpdSeqArrPart0 = StringMid($UpdSeqArr,1,4)
-   $UpdSeqArrPart1 = StringMid($UpdSeqArr,5,4)
-   $UpdSeqArrPart2 = StringMid($UpdSeqArr,9,4)
-   $RecordEnd1 = StringMid($record,1023,4)
-   $RecordEnd2 = StringMid($record,2047,4)
-   If $UpdSeqArrPart0 <> $RecordEnd1 OR $UpdSeqArrPart0 <> $RecordEnd2 Then
-      _DebugOut($FileRef & " The record failed Fixup", $record)
-      Return ""
-   EndIf
-   Return StringMid($record,1,1022) & $UpdSeqArrPart1 & StringMid($record,1027,1020) & $UpdSeqArrPart2
+	$UpdSeqArrOffset = Dec(_SwapEndian(StringMid($record,11,4)))
+	$UpdSeqArrSize = Dec(_SwapEndian(StringMid($record,15,4)))
+	$UpdSeqArr = StringMid($record,3+($UpdSeqArrOffset*2),$UpdSeqArrSize*2*2)
+	If $MFT_Record_Size = 1024 Then
+		$UpdSeqArrPart0 = StringMid($UpdSeqArr,1,4)
+		$UpdSeqArrPart1 = StringMid($UpdSeqArr,5,4)
+		$UpdSeqArrPart2 = StringMid($UpdSeqArr,9,4)
+		$RecordEnd1 = StringMid($record,1023,4)
+		$RecordEnd2 = StringMid($record,2047,4)
+		If $UpdSeqArrPart0 <> $RecordEnd1 OR $UpdSeqArrPart0 <> $RecordEnd2 Then
+			_DebugOut($FileRef & " The record failed Fixup", $record)
+			Return ""
+		EndIf
+		Return StringMid($record,1,1022) & $UpdSeqArrPart1 & StringMid($record,1027,1020) & $UpdSeqArrPart2
+	ElseIf $MFT_Record_Size = 4096 Then
+		$UpdSeqArrPart0 = StringMid($UpdSeqArr,1,4)
+		$UpdSeqArrPart1 = StringMid($UpdSeqArr,5,4)
+		$UpdSeqArrPart2 = StringMid($UpdSeqArr,9,4)
+		$UpdSeqArrPart3 = StringMid($UpdSeqArr,13,4)
+		$UpdSeqArrPart4 = StringMid($UpdSeqArr,17,4)
+		$UpdSeqArrPart5 = StringMid($UpdSeqArr,21,4)
+		$UpdSeqArrPart6 = StringMid($UpdSeqArr,25,4)
+		$UpdSeqArrPart7 = StringMid($UpdSeqArr,29,4)
+		$UpdSeqArrPart8 = StringMid($UpdSeqArr,33,4)
+		$RecordEnd1 = StringMid($record,1023,4)
+		$RecordEnd2 = StringMid($record,2047,4)
+		$RecordEnd3 = StringMid($record,3071,4)
+		$RecordEnd4 = StringMid($record,4095,4)
+		$RecordEnd5 = StringMid($record,5119,4)
+		$RecordEnd6 = StringMid($record,6143,4)
+		$RecordEnd7 = StringMid($record,7167,4)
+		$RecordEnd8 = StringMid($record,8191,4)
+		If $UpdSeqArrPart0 <> $RecordEnd1 OR $UpdSeqArrPart0 <> $RecordEnd2 OR $UpdSeqArrPart0 <> $RecordEnd3 OR $UpdSeqArrPart0 <> $RecordEnd4 OR $UpdSeqArrPart0 <> $RecordEnd5 OR $UpdSeqArrPart0 <> $RecordEnd6 OR $UpdSeqArrPart0 <> $RecordEnd7 OR $UpdSeqArrPart0 <> $RecordEnd8 Then
+			_DebugOut($FileRef & " The record failed Fixup", $record)
+			Return ""
+		Else
+			Return StringMid($record,1,1022) & $UpdSeqArrPart1 & StringMid($record,1027,1020) & $UpdSeqArrPart2 & StringMid($record,2051,1020) & $UpdSeqArrPart3 & StringMid($record,3075,1020) & $UpdSeqArrPart4 & StringMid($record,4099,1020) & $UpdSeqArrPart5 & StringMid($record,5123,1020) & $UpdSeqArrPart6 & StringMid($record,6147,1020) & $UpdSeqArrPart7 & StringMid($record,7171,1020) & $UpdSeqArrPart8
+		EndIf
+	EndIf
 EndFunc
 
 Func _GetAttrListMFTRecord($Pos)
@@ -831,17 +860,18 @@ Func _GetDiskConstants()
 	$record = DllStructGetData($tBuffer, 1)
 	$BytesPerSector = Dec(_SwapEndian(StringMid($record,25,4)),2)
 	$SectorsPerCluster = Dec(_SwapEndian(StringMid($record,29,2)),2)
-	$BytesPerCluster = $BytesPerSector * $SectorsPerCluster
+	$BytesPerCluster = $BytesPerSector * $SectorsPerCluster;
 	$LogicalClusterNumberforthefileMFT = Dec(_SwapEndian(StringMid($record,99,8)),2)
 	$MFT_Offset = $BytesPerCluster * $LogicalClusterNumberforthefileMFT
 	$ClustersPerFileRecordSegment = Dec(_SwapEndian(StringMid($record,131,8)),2)
-	If $ClustersPerFileRecordSegment > 127 Then
-		$MFT_Record_Size = 2 ^ (256 - $ClustersPerFileRecordSegment)
+	If Not $IsMftFile Then
+		If $ClustersPerFileRecordSegment > 127 Then
+			$MFT_Record_Size = 2 ^ (256 - $ClustersPerFileRecordSegment)
+		Else
+			$MFT_Record_Size = $BytesPerCluster * $ClustersPerFileRecordSegment
+		EndIf
 	Else
-		$MFT_Record_Size = $BytesPerCluster * $ClustersPerFileRecordSegment
-	EndIf
-	If $IsMftFile Then
-		Global $MFT_Record_Size = 1024
+		If $MFT_Record_Size <> 1024 And $MFT_Record_Size <> 4096 Then Return ""
 		Global $BytesPerCluster = 512*8
 		Global $MFT_Offset = 0
 	EndIf
@@ -1112,6 +1142,7 @@ Func _ParserCodeOldVersion($MFTEntry)
 	$UpdSeqArrSize = StringMid($MFTEntry, 15, 4)
 	$UpdSeqArrSize = Dec(_SwapEndian($UpdSeqArrSize),2)
 	$UpdSeqArr = StringMid($MFTEntry, 3 + ($UpdSeqArrOffset * 2), $UpdSeqArrSize * 2 * 2)
+	#cs
 	$UpdSeqArrPart0 = StringMid($UpdSeqArr, 1, 4)
 	$UpdSeqArrPart1 = StringMid($UpdSeqArr, 5, 4)
 	$UpdSeqArrPart2 = StringMid($UpdSeqArr, 9, 4)
@@ -1123,6 +1154,45 @@ Func _ParserCodeOldVersion($MFTEntry)
 		$IntegrityCheck = "OK"
 	EndIf
 	$MFTEntry = StringMid($MFTEntry, 1, 1022) & $UpdSeqArrPart1 & StringMid($MFTEntry, 1027, 1020) & $UpdSeqArrPart2 ; Stupid fixup to not corrupt decoding of attributes that are located past 0x1fd within record
+	#ce
+	If $MFT_Record_Size = 1024 Then
+		Local $UpdSeqArrPart0 = StringMid($UpdSeqArr,1,4)
+		Local $UpdSeqArrPart1 = StringMid($UpdSeqArr,5,4)
+		Local $UpdSeqArrPart2 = StringMid($UpdSeqArr,9,4)
+		Local $RecordEnd1 = StringMid($MFTEntry,1023,4)
+		Local $RecordEnd2 = StringMid($MFTEntry,2047,4)
+		If $RecordEnd1 <> $RecordEnd2 Or $UpdSeqArrPart0 <> $RecordEnd1 Then
+			$IntegrityCheck = "BAD"
+		Else
+			$IntegrityCheck = "OK"
+		EndIf
+		$MFTEntry = StringMid($MFTEntry,1,1022) & $UpdSeqArrPart1 & StringMid($MFTEntry,1027,1020) & $UpdSeqArrPart2
+	ElseIf $MFT_Record_Size = 4096 Then
+		Local $UpdSeqArrPart0 = StringMid($UpdSeqArr,1,4)
+		Local $UpdSeqArrPart1 = StringMid($UpdSeqArr,5,4)
+		Local $UpdSeqArrPart2 = StringMid($UpdSeqArr,9,4)
+		Local $UpdSeqArrPart3 = StringMid($UpdSeqArr,13,4)
+		Local $UpdSeqArrPart4 = StringMid($UpdSeqArr,17,4)
+		Local $UpdSeqArrPart5 = StringMid($UpdSeqArr,21,4)
+		Local $UpdSeqArrPart6 = StringMid($UpdSeqArr,25,4)
+		Local $UpdSeqArrPart7 = StringMid($UpdSeqArr,29,4)
+		Local $UpdSeqArrPart8 = StringMid($UpdSeqArr,33,4)
+		Local $RecordEnd1 = StringMid($MFTEntry,1023,4)
+		Local $RecordEnd2 = StringMid($MFTEntry,2047,4)
+		Local $RecordEnd3 = StringMid($MFTEntry,3071,4)
+		Local $RecordEnd4 = StringMid($MFTEntry,4095,4)
+		Local $RecordEnd5 = StringMid($MFTEntry,5119,4)
+		Local $RecordEnd6 = StringMid($MFTEntry,6143,4)
+		Local $RecordEnd7 = StringMid($MFTEntry,7167,4)
+		Local $RecordEnd8 = StringMid($MFTEntry,8191,4)
+		If $UpdSeqArrPart0 <> $RecordEnd1 OR $UpdSeqArrPart0 <> $RecordEnd2 OR $UpdSeqArrPart0 <> $RecordEnd3 OR $UpdSeqArrPart0 <> $RecordEnd4 OR $UpdSeqArrPart0 <> $RecordEnd5 OR $UpdSeqArrPart0 <> $RecordEnd6 OR $UpdSeqArrPart0 <> $RecordEnd7 OR $UpdSeqArrPart0 <> $RecordEnd8 Then
+			$IntegrityCheck = "BAD"
+		Else
+			$IntegrityCheck = "OK"
+		EndIf
+		$MFTEntry =  StringMid($MFTEntry,1,1022) & $UpdSeqArrPart1 & StringMid($MFTEntry,1027,1020) & $UpdSeqArrPart2 & StringMid($MFTEntry,2051,1020) & $UpdSeqArrPart3 & StringMid($MFTEntry,3075,1020) & $UpdSeqArrPart4 & StringMid($MFTEntry,4099,1020) & $UpdSeqArrPart5 & StringMid($MFTEntry,5123,1020) & $UpdSeqArrPart6 & StringMid($MFTEntry,6147,1020) & $UpdSeqArrPart7 & StringMid($MFTEntry,7171,1020) & $UpdSeqArrPart8
+	EndIf
+
 	$HDR_LSN = StringMid($MFTEntry, 19, 16)
 	$HDR_LSN = Dec(_SwapEndian($HDR_LSN),2)
 	$HDR_SequenceNo = StringMid($MFTEntry, 35, 4)
@@ -2660,7 +2730,7 @@ Func _ExtractResidentFile($Name, $Size, $record)
 	Do
         DirCreate(StringMid($Name, 1, StringInStr($Name,"\",0,-1)))
 ;		$hFile = _WinAPI_CreateFile("\\.\" & $ExtractionPath & "\" & $Name,3,6,7)
-		$hFile = _WinAPI_CreateFile("\\.\" & $ExtractionPath & "\[0x" & Hex($CurrentProgress*1024,8) & "]" & $Name,3,6,7)
+		$hFile = _WinAPI_CreateFile("\\.\" & $ExtractionPath & "\[0x" & Hex($CurrentProgress*$MFT_Record_Size,8) & "]" & $Name,3,6,7)
 ;		$hFile = _WinAPI_CreateFile("\\.\" & $ExtractionPath & "\" & $Name & "[0x" & Hex($CurrentProgress*1024,8) & "]",3,6,7)
         If $hFile Then
             _WinAPI_SetFilePointer($hFile, 0,$FILE_BEGIN)
