@@ -1,5 +1,7 @@
 Mft2Csv changelog
 
+v2.0.0.19. Fixed incorrectly reported offsets of records.
+
 v2.0.0.18. Added complete support for MFT record size of 4096.
 
 v2.0.0.17. Fixed a unicode related bug that caused the last character to be incorrect when the character was of 2 bytes.

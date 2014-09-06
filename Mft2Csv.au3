@@ -1,8 +1,9 @@
 #RequireAdmin
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
+#AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.18
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.19
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -106,7 +107,7 @@ Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
 
-$Form = GUICreate("MFT2CSV 2.0.0.18", 560, 450, -1, -1)
+$Form = GUICreate("MFT2CSV 2.0.0.19", 560, 450, -1, -1)
 GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
 
 $Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
@@ -365,9 +366,9 @@ Func _ExtractSystemfile()
 	$rBuffer = DllStructCreate("byte[" & $MFT_Record_Size & "]")     ;buffer for records
 
 	$MFT = _ReadMFT()
-	If $MFT = "" Then Return		;something wrong with record for $MFT
+	If $MFT = "" And Not $MftIsBroken Then Return		;something wrong with record for $MFT
 	$MFT = _DecodeMFTRecord($MFT, 0)        ;produces DataQ for $MFT, record 0
-	If $MFT = "" Then Return
+	If $MFT = "" And Not $MftIsBroken Then Return
 ;	_ArrayDisplay($DataQ,"$DataQ")
 	_DecodeDataQEntry($DataQ[1])         ;produces datarun for $MFT
 	$MFT_Size = $DT_RealSize
@@ -394,7 +395,6 @@ Func _ExtractSystemfile()
 	$FileProgress = GUICtrlCreateProgress(10, 415, 540, 30)
 	AdlibRegister("_ExtractionProgress", 500)
 	$begin = TimerInit()
-
 	For $i = 0 To UBound($FileTree)-1	;note $i is mft reference number
 		$CurrentProgress = $i
 		$Files = $Filetree[$i]
@@ -403,8 +403,9 @@ Func _ExtractSystemfile()
 			$RecordOffsetDec = $MFT_Record_Size * $i
 		Else
 			_WinAPI_SetFilePointerEx($hDisk, $MFTTree[$i], $FILE_BEGIN)
-			$RecordOffsetDec = Int($MFTTree[$i])
+			$RecordOffsetDec = $MFTTree[$i]
 		EndIf
+		$RecordOffsetDec = Int($RecordOffsetDec)
 		_WinAPI_ReadFile($hDisk, DllStructGetPtr($rBuffer), $MFT_Record_Size, $nBytes)
 		$FN_NamePath = StringMid($Files, 1,StringInStr($Files, "?") - 1)
 		$FN_FileName = $FN_NamePath
@@ -718,6 +719,11 @@ Func _DecodeDataQEntry($attr)		;processes data attribute
 EndFunc
 
 Func _DecodeMFTRecord($record, $FileRef)      ;produces DataQ
+;	Local $record_tmp
+;	If $MftIsBroken Then
+;		$record_tmp = _DoFixup($record, $FileRef)
+;		If Not $record_tmp = "" Then $record = $record_tmp
+;	EndIf
 	If Not $SkipFixups Then $record = _DoFixup($record, $FileRef)
 	If $record = "" then Return ""  ;corrupt, failed fixup
 	$RecordSize = Dec(_SwapEndian(StringMid($record,51,8)),2)

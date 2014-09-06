@@ -1,0 +1,65 @@
+Main Wiki: http://code.google.com/p/mft2csv/wiki/mft2csv
+
+Usage scenarios:
+
+For all scenarios, one must:
+Select the output format. Default is set to dump as much as possible.
+Select the separator, and wether quotation mark is to be surrounding the written values in the csv. Default separator is pipe ("|").
+Select which timezone the timestamps should be dumped to. Default is UTC 0.00.
+Select if fixups should be skipped or not. Default to off. Usually only applicable in very specific situations.
+Select if $MFT should be treated as broken. Default to off. Only applicable when using $MFT file as input. Should be used when fragments of $MFT is used and  $MFT is not in the first record.
+Select if resident data should be extracted. Default to off. Require to select the path to extract to.
+Select format of decoded timestamps, as well as the precision (None, MilliSec, NanoSec). Examples are displayed in GUI. Choose if extra timestamps are to be dumped to a seperate csv by ticking off "split csv".
+
+1. Parsing $MFT on the systemdrive from your running live system.
+Detected NTFS volumes will be displayed in the second combobox from the top. If new drive is attached or mounted, click "Rescan Mounted Drives". Select target volume in the second combo.
+Configure the stuff mentioned at the top. 
+Press "Start Processing".
+
+2. Parsing $MFT off a volume on \\.\PhysicalDrive1 which is not mounted.
+Check the dropdown in the first combo. Normally you should at least have PhysicalDrive0 in there. Optionally rescan for attached drives by clicking "Scan PhysicalDrive". 
+Select wanted drive in first combo. Then click "Test it". Found volumes will be populated in the second combo, and temporarily replace the mounted volumes. 
+When correct one chosen, confiure the rest of the necessary stuff like already explained.
+Press "Start Processing".
+
+3. Parsing an image file (of disk or partition).
+Press "Choose Image" and browse to the target image.
+Identified volumes will be populated into the combobox at the top. Select the target volume.
+Configure the stuff mentioned at the top.
+Press "Start Processing".
+
+4. Parsing an already extracted $MFT.
+Press "Choose $MFT" and browse to the target $MFT.
+Configure the stuff mentioned at the top.
+Press "Start Processing".
+
+5. Parse an $MFT reconstructed from a memory dump.
+Run MFTCarver on the memory dump file, and output a pseudo $MFT file.
+Press "Choose $MFT" and browse to the file you just created.
+Configure the stuff mentioned at the top.
+Configure "Skip Fixups".
+Configure "Broken $MFT".
+Press "Start Processing".
+
+6. Extract resident data from a memory dump
+Do as in example 4.
+But also configure "Extract Resident". Then press "Set Extract Path" and browse to and select target output path.
+Press "Start Processing".
+
+7. Parsing $MFT directly from a shadow copy.
+Press the button "Scan Shadows", and watch any found shadow copies in the top combo/drop down. Press the button "Test it" to verify it, and found volumes will be populated in the second combo, and temporarily replace the mounted volumes. 
+When correct one chosen, confiure the rest of the necessary stuff like already explained.
+Press "Start Processing".
+
+
+Note about extracted resident data
+The extracted files must obviously have the nonresident flag set to 00. Regular files and alternate data streams are supported. These can be up to about 700 bytes in size. They are extracted to their original name, but no folder structure is regenerated. To reduce the risk of overwriting files with similar filenames and to help identify where in the $MFT the file was extracted from, the $MFT offset will be prefixed to the filename like for instance:
+[0x00228000]import.reg
+
+Any deleted files will be prefixed with [DEL] like this:
+[0x00228000][DEL]import.reg
+
+Alternate data steams will have the name of the data stream prefixed with ADS_ and attached behind the original filename like:
+[0x00228400][DEL]import.reg[ADS_Zone.Identifier]
+
+
