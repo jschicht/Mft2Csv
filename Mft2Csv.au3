@@ -3,7 +3,7 @@
 #AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.19
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.20
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -17,7 +17,7 @@
 ; by Joakim Schicht & Ddan
 ; parts by trancexxx, Ascend4nt & others
 
-Global $_COMMON_KERNEL32DLL=DllOpen("kernel32.dll"), $separator="|", $DTPrecision, $dol2t=False, $DoDefaultAll=False, $DoBodyfile=False, $SkipFixups=False, $MftIsBroken=False, $ExtractResident=False, $ExtractionPath, $DoSplitCsv=False, $csvextra, $style, $TimestampStart
+Global $_COMMON_KERNEL32DLL=DllOpen("kernel32.dll"), $separator="|", $dol2t=False, $DoDefaultAll=False, $DoBodyfile=False, $SkipFixups=False, $MftIsBroken=False, $ExtractResident=False, $ExtractionPath, $DoSplitCsv=False, $csvextra, $style, $TimestampStart
 Global $csv, $csvfile, $RecordOffset, $Signature, $ADS, $FN_NamePath, $UTCconfig, $de=",", $MftFileSize, $FN_FileName;, $DATA_Clusters, $DATA_InitSize
 Global $HDR_LSN, $HDR_SequenceNo, $HDR_Flags, $HDR_RecRealSize, $HDR_RecAllocSize, $HDR_BaseRecord, $HDR_NextAttribID, $HDR_MFTREcordNumber, $HDR_HardLinkCount, $HDR_BaseRecSeqNo
 Global $SI_CTime, $SI_ATime, $SI_MTime, $SI_RTime, $SI_FilePermission, $SI_USN, $Errors, $DT_AllocSize, $DT_RealSize, $DT_InitStreamSize, $RecordSlackSpace
@@ -107,7 +107,7 @@ Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
 
-$Form = GUICreate("MFT2CSV 2.0.0.19", 560, 450, -1, -1)
+$Form = GUICreate("MFT2CSV 2.0.0.20", 560, 450, -1, -1)
 GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
 
 $Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
@@ -319,18 +319,12 @@ Func _ExtractSystemfile()
 	EndIf
 	If GUICtrlRead($checkl2t) = 1 Then
 		$Dol2t = True
-		$DateTimeFormat = 2
-		$DTPrecision = 1
 		_DebugOut("Using output format: log2timeline")
 	ElseIf GUICtrlRead($checkbodyfile) = 1 Then
 		$DoBodyfile = True
-		$DateTimeFormat = 2
-		$DTPrecision = 1
 		_DebugOut("Using output format: bodyfile")
 	ElseIf GUICtrlRead($checkdefaultall) = 1 Then
 		$DoDefaultAll = True
-		$DateTimeFormat = 6
-		$DTPrecision = 2
 		_DebugOut("Using output format: all")
 	EndIf
 	If StringLen(GUICtrlRead($SaparatorInput)) <> 1 Then

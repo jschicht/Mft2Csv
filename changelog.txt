@@ -1,5 +1,7 @@
 Mft2Csv changelog
 
+v2.0.0.20. Fixed bug that caused chosen date/time format to always be set to 2.
+
 v2.0.0.19. Fixed incorrectly reported offsets of records.
 
 v2.0.0.18. Added complete support for MFT record size of 4096.
