@@ -1,16 +1,15 @@
 #RequireAdmin
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
-#AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.20
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.21
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
 #Include <WinAPIEx.au3>
 #include <String.au3>
 #include <Date.au3>
-
+#include <array.au3>
 ; https://github.com/jschicht
 ; http://code.google.com/p/mft2csv/
 ;
@@ -18,7 +17,7 @@
 ; parts by trancexxx, Ascend4nt & others
 
 Global $_COMMON_KERNEL32DLL=DllOpen("kernel32.dll"), $separator="|", $dol2t=False, $DoDefaultAll=False, $DoBodyfile=False, $SkipFixups=False, $MftIsBroken=False, $ExtractResident=False, $ExtractionPath, $DoSplitCsv=False, $csvextra, $style, $TimestampStart
-Global $csv, $csvfile, $RecordOffset, $Signature, $ADS, $FN_NamePath, $UTCconfig, $de=",", $MftFileSize, $FN_FileName;, $DATA_Clusters, $DATA_InitSize
+Global $csv, $csvfile, $RecordOffset, $Signature, $ADS, $FN_NamePath, $UTCconfig, $de=",", $MftFileSize, $FN_FileName, $LogicalClusterNumberforthefileMFT, $ClustersPerFileRecordSegment, $MftAttrListString, $BytesPerSector, $SplitMftRecArr[1]
 Global $HDR_LSN, $HDR_SequenceNo, $HDR_Flags, $HDR_RecRealSize, $HDR_RecAllocSize, $HDR_BaseRecord, $HDR_NextAttribID, $HDR_MFTREcordNumber, $HDR_HardLinkCount, $HDR_BaseRecSeqNo
 Global $SI_CTime, $SI_ATime, $SI_MTime, $SI_RTime, $SI_FilePermission, $SI_USN, $Errors, $DT_AllocSize, $DT_RealSize, $DT_InitStreamSize, $RecordSlackSpace
 Global $SI_CTime_Core,$SI_ATime_Core,$SI_MTime_Core,$SI_RTime_Core,$SI_CTime_Precision,$SI_ATime_Precision,$SI_MTime_Precision,$SI_RTime_Precision
@@ -100,14 +99,14 @@ Global $DT_LengthOfAttribute, $DT_Clusters, $DT_RealSize, $DT_InitSize, $DataRun
 Global $IsCompressed, $IsSparse, $subset, $logfile = 0, $subst, $active = False
 Global $RUN_VCN[1], $RUN_Clusters[1], $MFT_RUN_Clusters[1], $MFT_RUN_VCN[1], $DataQ[1], $AttrQ[1]
 Global $TargetImageFile, $Entries, $IsImage = False, $ImageOffset=0, $IsMftFile=False, $TargetMftFile
-Global $begin, $ElapsedTime
+Global $begin, $ElapsedTime,$InitState=1
 Global $OverallProgress, $FileProgress, $CurrentProgress=-1, $ProgressStatus, $ProgressFileName, $ProgressSize
 
 Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
 
-$Form = GUICreate("MFT2CSV 2.0.0.20", 560, 450, -1, -1)
+$Form = GUICreate("MFT2CSV 2.0.0.21", 560, 450, -1, -1)
 GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
 
 $Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
@@ -361,18 +360,21 @@ Func _ExtractSystemfile()
 
 	$MFT = _ReadMFT()
 	If $MFT = "" And Not $MftIsBroken Then Return		;something wrong with record for $MFT
-	$MFT = _DecodeMFTRecord($MFT, 0)        ;produces DataQ for $MFT, record 0
+
+	$MFT = _DecodeMFTRecord0($MFT, 0)        ;produces DataQ for $MFT, record 0
 	If $MFT = "" And Not $MftIsBroken Then Return
-;	_ArrayDisplay($DataQ,"$DataQ")
-	_DecodeDataQEntry($DataQ[1])         ;produces datarun for $MFT
+
+	_GetRunsFromAttributeListMFT0() ;produces datarun for $MFT and converts datarun to RUN_VCN[] and RUN_Clusters[]
+
 	$MFT_Size = $DT_RealSize
-	_ExtractDataRuns()                   ;converts datarun to RUN_VCN[] and RUN_Clusters[]
+
 	If ($IsMftFile And $MftIsBroken) Then
 		$RUN_VCN[1] = 1
 		$RUN_Clusters[1] = Int(((512+$MftFileSize-Mod($MftFileSize,512))/512/8))
 	EndIf
 	$MFT_RUN_VCN = $RUN_VCN
 	$MFT_RUN_Clusters = $RUN_Clusters	;preserve values for $MFT
+
 	$Progress = GUICtrlCreateLabel("Decoding $MFT info and writing to csv", 10, 280,540,20)
 	GUICtrlSetFont($Progress, 12)
 	$ProgressStatus = GUICtrlCreateLabel("", 10, 310, 540, 20)
@@ -384,7 +386,7 @@ Func _ExtractSystemfile()
 		$Total = ($MftFileSize/$MFT_Record_Size)
 		Redim $FileTree[$Total]
 	EndIf
-;	_ArrayDisplay($MFTTree,"$MFTTree")
+
 	$ProgressFileName = GUICtrlCreateLabel("", 10,  390, 540, 20, $DT_END_ELLIPSIS)
 	$FileProgress = GUICtrlCreateProgress(10, 415, 540, 30)
 	AdlibRegister("_ExtractionProgress", 500)
@@ -392,18 +394,48 @@ Func _ExtractSystemfile()
 	For $i = 0 To UBound($FileTree)-1	;note $i is mft reference number
 		$CurrentProgress = $i
 		$Files = $Filetree[$i]
-		If $IsMftFile Then
-			_WinAPI_SetFilePointerEx($hDisk, $i*$MFT_Record_Size, $FILE_BEGIN)
-			$RecordOffsetDec = $MFT_Record_Size * $i
+		If StringInStr($Files, "/") > 0 Then ;MFT record was split across 2 dataruns
+			_DebugOut("Ref " & $i & " has its record split across 2 dataruns")
+			$SplitRecordPart1 = StringMid($Files, StringInStr($Files, "/")+1)
+			$SplitRecordPart2 = $SplitMftRecArr[$SplitRecordPart1]
+			$SplitRecordTestRef = StringMid($SplitRecordPart2, 1, StringInStr($SplitRecordPart2, "?")-1)
+			If $SplitRecordTestRef <> $i Then ;then something is not quite right
+				_DebugOut("Error: The ref in the array did not match target ref.")
+				ContinueLoop
+			EndIf
+			$SplitRecordPart3 = StringMid($SplitRecordPart2, StringInStr($SplitRecordPart2, "?")+1)
+			$SplitRecordArr = StringSplit($SplitRecordPart3,"|")
+			If UBound($SplitRecordArr) <> 3 Then
+				_DebugOut("Error: Array contained more elements than expected: " & UBound($SplitRecordArr))
+				ContinueLoop
+			EndIf
+			$MFTEntry="0x"
+			For $k = 1 To Ubound($SplitRecordArr)-1
+				$SplitRecordOffset = StringMid($SplitRecordArr[$k], 1, StringInStr($SplitRecordArr[$k], ",")-1)
+				$SplitRecordSize = StringMid($SplitRecordArr[$k], StringInStr($SplitRecordArr[$k], ",")+1)
+				_WinAPI_SetFilePointerEx($hDisk, $ImageOffset+$SplitRecordOffset, $FILE_BEGIN)
+				$kBuffer = DllStructCreate("byte["&$SplitRecordSize&"]")
+				_WinAPI_ReadFile($hDisk, DllStructGetPtr($kBuffer), $SplitRecordSize, $nBytes)
+				$MFTEntry &= StringMid(DllStructGetData($kBuffer,1),3)
+				$RecordOffsetDec = $SplitRecordOffset
+				_DebugOut("	part " & $k & " of record has " & $SplitRecordSize & " bytes at raw offset 0x" & Hex(Int($ImageOffset+$SplitRecordOffset)))
+				$kBuffer=0
+			Next
+;			ConsoleWrite(_HexEncode($MFTEntry) & @CRLF)
 		Else
-			_WinAPI_SetFilePointerEx($hDisk, $MFTTree[$i], $FILE_BEGIN)
-			$RecordOffsetDec = $MFTTree[$i]
+			If $IsMftFile Then
+				_WinAPI_SetFilePointerEx($hDisk, $i*$MFT_Record_Size, $FILE_BEGIN)
+				$RecordOffsetDec = $MFT_Record_Size * $i
+			Else
+				_WinAPI_SetFilePointerEx($hDisk, $MFTTree[$i], $FILE_BEGIN)
+				$RecordOffsetDec = $MFTTree[$i]
+			EndIf
+			$RecordOffsetDec = Int($RecordOffsetDec)
+			_WinAPI_ReadFile($hDisk, DllStructGetPtr($rBuffer), $MFT_Record_Size, $nBytes)
+			$MFTEntry = DllStructGetData($rBuffer, 1)
 		EndIf
-		$RecordOffsetDec = Int($RecordOffsetDec)
-		_WinAPI_ReadFile($hDisk, DllStructGetPtr($rBuffer), $MFT_Record_Size, $nBytes)
 		$FN_NamePath = StringMid($Files, 1,StringInStr($Files, "?") - 1)
 		$FN_FileName = $FN_NamePath
-		$MFTEntry = DllStructGetData($rBuffer, 1)
 		If (StringMid($MFTEntry, 3, 8) = '46494C45') Then
 			$Signature = "GOOD"
 		ElseIf (StringMid($MFTEntry, 3, 8) = '42414144') Then
@@ -484,7 +516,7 @@ Func _ExtractSystemfile()
 EndFunc
 
 Func _DoFileTree()
-	Local $nBytes, $ParentRef, $FileRef, $BaseRef, $tag, $PrintName, $testvar=0
+	Local $nBytes, $ParentRef, $FileRef, $BaseRef, $tag, $PrintName, $testvar=0, $TmpRecord, $MFTClustersToKeep=0, $DoKeepCluster=0, $Subtr, $PartOfAttrList=0, $ArrSize
 	$Total = Int($MFT_Size/$MFT_Record_Size)
 	Global $FileTree[$Total+1]
 	Global $MFTTree[$Total+1]
@@ -494,20 +526,56 @@ Func _DoFileTree()
 	AdlibRegister("_DoFileTreeProgress", 500)
 	$begin = TimerInit()
 	For $r = 1 To Ubound($MFT_RUN_VCN)-1
+		$DoKeepCluster=$MFTClustersToKeep
+		$MFTClustersToKeep = Mod($MFT_RUN_Clusters[$r]+($ClustersPerFileRecordSegment-$MFTClustersToKeep),$ClustersPerFileRecordSegment)
+		If $MFTClustersToKeep <> 0 Then
+			$MFTClustersToKeep = $ClustersPerFileRecordSegment - $MFTClustersToKeep ;How many clusters are we missing to get the full MFT record
+		EndIf
 		If Not $IsMftFile Then
 			$Pos = $MFT_RUN_VCN[$r]*$BytesPerCluster
 			_WinAPI_SetFilePointerEx($hDisk, $ImageOffset+$Pos, $FILE_BEGIN)
 		Else
-			;$Pos = $testvar*1024
 			$Pos = $testvar*$MFT_Record_Size
 		EndIf
-		For $i = 0 To $MFT_RUN_Clusters[$r]*$BytesPerCluster-$MFT_Record_Size Step $MFT_Record_Size
+		If $MFTClustersToKeep Or $DoKeepCluster Then
+			$Subtr = 0
+		Else
+			$Subtr = $MFT_Record_Size
+		EndIf
+		$EndOfRun = $MFT_RUN_Clusters[$r]*$BytesPerCluster-$Subtr
+		For $i = 0 To $MFT_RUN_Clusters[$r]*$BytesPerCluster-$Subtr Step $MFT_Record_Size
+			If $MFTClustersToKeep Then
+				If $i >= $EndOfRun-(($ClustersPerFileRecordSegment-$MFTClustersToKeep)*$BytesPerCluster) Then
+					$BytesToGet = ($ClustersPerFileRecordSegment-$MFTClustersToKeep)*$BytesPerCluster
+					$CurrentOffset = DllCall('kernel32.dll', 'int', 'SetFilePointerEx', 'ptr', $hDisk, 'int64', 0, 'int64*', 0, 'dword', 1)
+					_WinAPI_ReadFile($hDisk, DllStructGetPtr($rBuffer), $BytesToGet, $nBytes)
+					$TmpRecord = StringMid(DllStructGetData($rBuffer, 1),1, 2+($BytesToGet*2))
+					$ArrSize = UBound($SplitMftRecArr)
+					ReDim $SplitMftRecArr[$ArrSize+1]
+					$SplitMftRecArr[$ArrSize] = $ref+1 & '?' & $CurrentOffset[3] & ',' & $BytesToGet
+					ContinueLoop
+				EndIf
+			EndIf
 			$ref += 1
 			If $ref > $Total Then ExitLoop
 			$testvar += 1
 			$CurrentProgress = $ref
-			_WinAPI_ReadFile($hDisk, DllStructGetPtr($rBuffer), $MFT_Record_Size, $nBytes)
-			$record = DllStructGetData($rBuffer, 1)
+			If $i = 0 And $DoKeepCluster Then
+				If $TmpRecord <> "" Then $record = $TmpRecord
+				$BytesToGet = $DoKeepCluster*$BytesPerCluster
+				if $BytesToGet > $MFT_Record_Size Then
+					MsgBox(0,"Error","$BytesToGet > $MFT_Record_Size")
+					$BytesToGet = $MFT_Record_Size
+				EndIf
+				$CurrentOffset = DllCall('kernel32.dll', 'int', 'SetFilePointerEx', 'ptr', $hDisk, 'int64', 0, 'int64*', 0, 'dword', 1)
+				_WinAPI_ReadFile($hDisk, DllStructGetPtr($rBuffer), $BytesToGet, $nBytes)
+				$record &= StringMid(DllStructGetData($rBuffer, 1),3, $BytesToGet*2)
+				$TmpRecord=""
+				$SplitMftRecArr[$ArrSize] &= '|' & $CurrentOffset[3] & ',' & $BytesToGet
+			Else
+				_WinAPI_ReadFile($hDisk, DllStructGetPtr($rBuffer), $MFT_Record_Size, $nBytes)
+				$record = DllStructGetData($rBuffer, 1)
+			EndIf
 			If StringMid($record,3,8) <> $RecordSignature Then
 				_DebugOut($ref & " The record signature is bad", StringMid($record, 1, 34))
 				ContinueLoop
@@ -519,9 +587,13 @@ Func _DoFileTree()
 			If $record = "" then ContinueLoop   ;corrupt, failed fixup
 			$FileRef = $ref
 			$BaseRef = Dec(_SwapEndian(StringMid($record,67,8)),2)
-			If $BaseRef <> 0 Then
+			If $BaseRef <> 0 Or StringInStr($MftAttrListString,','&$FileRef&',') Then ;The baseRef can be 0 for the extra records when $MFT contains $ATTRIBUTE_LIST
+				_DebugOut("Ref " & $FileRef & " has baseref " & $BaseRef)
 				$FileTree[$FileRef] = $Pos + $i      ;may contain data attribute
 				$FileRef = $BaseRef
+				$PartOfAttrList=1
+			Else
+				$PartOfAttrList=0
 			EndIf
 			$Offset = (Dec(StringMid($record,43,2))*2)+3
 			$FileName = ""
@@ -555,8 +627,9 @@ Func _DoFileTree()
 				EndIf
 				$Offset += $Size*2
 			WEnd
-			If Not BitAND($Flags,Dec("0200")) And $BaseRef = 0 And $FileTree[$FileRef] <> "" Then $FileTree[$FileRef] &= "?" & ($Pos + $i)     ;file also add FilePointer
+			If Not BitAND($Flags,Dec("0200")) And $PartOfAttrList=0 And $FileTree[$FileRef] <> "" Then $FileTree[$FileRef] &= "?" & ($Pos + $i)     ;file also add FilePointer
 			If StringInStr($FileTree[$FileRef], "**") = 1 Then $FileTree[$FileRef] = StringTrimLeft($FileTree[$FileRef],2)    ;remove leading **
+			If $i = 0 And $DoKeepCluster Then $FileTree[$FileRef] &= "/" & $ArrSize  ;Mark record as being split across 2 runs
 		Next
 	Next
 	AdlibUnRegister()
@@ -564,7 +637,6 @@ Func _DoFileTree()
 	$begin = TimerInit()
 	AdlibRegister("_FolderStrucProgress", 500)
 	For $i = 0 to UBound($FileTree)-1
-;	   ConsoleWrite("$FileTree[$i:"&$i&"]: " & $FileTree[$i] & @CRLF)
 		$CurrentProgress = $i
 		If StringInStr($FileTree[$i], "**") = 0 Then
 			While StringInStr($FileTree[$i], "*") > 0   ;single file
@@ -642,7 +714,7 @@ EndFunc
 
 Func _ExtractDataRuns()
    $r=UBound($RUN_Clusters)
-   ReDim $RUN_Clusters[$r + 400], $RUN_VCN[$r + 400]
+   ReDim $RUN_Clusters[$r + $MFT_Record_Size], $RUN_VCN[$r + $MFT_Record_Size]
    $i=1
    $RUN_VCN[0] = 0
    $BaseVCN = $RUN_VCN[0]
@@ -712,12 +784,62 @@ Func _DecodeDataQEntry($attr)		;processes data attribute
   EndIf
 EndFunc
 
+Func _DecodeMFTRecord0($record, $FileRef)      ;produces DataQ
+	$MftAttrListString=","
+	$record = _DoFixup($record, $FileRef)
+	If $record = "" then Return ""  ;corrupt, failed fixup
+	$RecordSize = Dec(_SwapEndian(StringMid($record,51,8)),2)
+	$AttributeOffset = (Dec(StringMid($record,43,2))*2)+3
+	While 1		;only want Attribute List and Data Attributes
+		$Type = Dec(_SwapEndian(StringMid($record,$AttributeOffset,8)),2)
+		If $Type > 256 Then ExitLoop		;attributes may not be in numerical order
+		$AttributeSize = Dec(_SwapEndian(StringMid($record,$AttributeOffset+8,8)),2)
+		If $Type = 32 Then
+			$AttrList = StringMid($record,$AttributeOffset,$AttributeSize*2)	;whole attribute
+			$AttrList = _DecodeAttrList($FileRef, $AttrList)		;produces $AttrQ - extra record list
+			If $AttrList = "" Then
+				_DebugOut($FileRef & " Bad Attribute List signature", $record)
+				Return ""
+			Else
+				If $AttrQ[0] = "" Then ContinueLoop		;no new records
+				$str = ""
+				For $i = 1 To $AttrQ[0]
+					$MftAttrListString &= $AttrQ[$i] & ","
+					If Not IsNumber(Int($AttrQ[$i])) Then
+						_DebugOut($FileRef & " Overwritten extra record (" & $AttrQ[$i] & ")", $record)
+						Return ""
+					EndIf
+					$rec = _GetAttrListMFTRecord(($AttrQ[$i]*$MFT_Record_Size)+($LogicalClusterNumberforthefileMFT*$BytesPerCluster))
+					If StringMid($rec,3,8) <> $RecordSignature Then
+						_DebugOut($FileRef & " Bad signature for extra record", $record)
+						Return ""
+					EndIf
+					If Dec(_SwapEndian(StringMid($rec,67,8)),2) <> $FileRef Then
+						_DebugOut($FileRef & " Bad extra record", $record)
+						Return ""
+					EndIf
+					$rec = _StripMftRecord($rec, $FileRef)
+					If $rec = "" Then
+						_DebugOut($FileRef & " Extra record failed Fixup", $record)
+						Return ""
+					EndIf
+					$str &= $rec		;no header or end marker
+				Next
+				$record = StringMid($record,1,($RecordSize-8)*2+2) & $str & "FFFFFFFF"       ;strip end first then add
+			EndIf
+		ElseIf $Type = 128 Then
+			ReDim $DataQ[UBound($DataQ) + 1]
+			$DataQ[UBound($DataQ) - 1] = StringMid($record,$AttributeOffset,$AttributeSize*2) 		;whole data attribute
+		EndIf
+		$AttributeOffset += $AttributeSize*2
+	WEnd
+	If ($IsMftFile And $MftIsBroken) Or ($IsMftFile And UBound($AttrQ) > 1) Then
+		_GenDummyDataQ()
+	EndIf
+	Return $record
+EndFunc
+
 Func _DecodeMFTRecord($record, $FileRef)      ;produces DataQ
-;	Local $record_tmp
-;	If $MftIsBroken Then
-;		$record_tmp = _DoFixup($record, $FileRef)
-;		If Not $record_tmp = "" Then $record = $record_tmp
-;	EndIf
 	If Not $SkipFixups Then $record = _DoFixup($record, $FileRef)
 	If $record = "" then Return ""  ;corrupt, failed fixup
 	$RecordSize = Dec(_SwapEndian(StringMid($record,51,8)),2)
@@ -778,11 +900,6 @@ Func _DecodeMFTRecord($record, $FileRef)      ;produces DataQ
 		EndIf
 		$AttributeOffset += $AttributeSize*2
 	WEnd
-  	If $CurrentProgress=-1 Then ; Only create dummy data attribute to mimick $MFT as first record when using corrupted $MFT as input
-		If $IsMftFile And $MftIsBroken Then
-			_GenDummyDataQ()
-		EndIf
-	EndIf
 	Return $record
 EndFunc
 
@@ -1081,26 +1198,7 @@ Func _CheckExtendedPartition($StartSector, $hImage)	;Extended partitions can onl
 	  $NextEntry = Dec(_SwapEndian(StringMid($PartitionTable,49,8)),2)
    WEnd
 EndFunc   ;==>_CheckExtendedPartition
-#cs
-Func _TestNTFS($hImage, $PartitionStartSector)
-	Local $nbytes
-	If $PartitionStartSector <> 0 Then
-		_WinAPI_SetFilePointerEx($hImage, $PartitionStartSector*512, $FILE_BEGIN)
-	Else
-		_WinAPI_CloseHandle($hImage)
-		$hImage = _WinAPI_CreateFile("\\.\" & $TargetImageFile,2,2,7)
-	EndIf
-	$tBuffer = DllStructCreate("byte[512]")
-	$read = _WinAPI_ReadFile($hImage, DllStructGetPtr($tBuffer), 512, $nBytes)
-	If $read = 0 Then Return ""
-	$sector = DllStructGetData($tBuffer, 1)
-	$TestSig = StringMid($sector,9,8)
-	If $TestSig = "4E544653" Then Return 1		; Volume is NTFS
-;	_DebugOut("Could not find NTFS:", StringMid($sector,3))		; Volume is not NTFS
-	_DebugOut("Could not find NTFS:", $sector)		; Volume is not NTFS
-    Return 0
-EndFunc   ;==>_TestNTFS
-#ce
+
 Func _TestNTFS($hImage, $PartitionStartSector)
 	Local $nbytes, $TotalSectors
 	If $PartitionStartSector <> 0 Then
@@ -1142,19 +1240,7 @@ Func _ParserCodeOldVersion($MFTEntry)
 	$UpdSeqArrSize = StringMid($MFTEntry, 15, 4)
 	$UpdSeqArrSize = Dec(_SwapEndian($UpdSeqArrSize),2)
 	$UpdSeqArr = StringMid($MFTEntry, 3 + ($UpdSeqArrOffset * 2), $UpdSeqArrSize * 2 * 2)
-	#cs
-	$UpdSeqArrPart0 = StringMid($UpdSeqArr, 1, 4)
-	$UpdSeqArrPart1 = StringMid($UpdSeqArr, 5, 4)
-	$UpdSeqArrPart2 = StringMid($UpdSeqArr, 9, 4)
-	$RecordEnd1 = StringMid($MFTEntry, 1023, 4)
-	$RecordEnd2 = StringMid($MFTEntry, 2047, 4)
-	If $RecordEnd1 <> $RecordEnd2 Or $UpdSeqArrPart0 <> $RecordEnd1 Then
-		$IntegrityCheck = "BAD"
-	Else
-		$IntegrityCheck = "OK"
-	EndIf
-	$MFTEntry = StringMid($MFTEntry, 1, 1022) & $UpdSeqArrPart1 & StringMid($MFTEntry, 1027, 1020) & $UpdSeqArrPart2 ; Stupid fixup to not corrupt decoding of attributes that are located past 0x1fd within record
-	#ce
+
 	If $MFT_Record_Size = 1024 Then
 		Local $UpdSeqArrPart0 = StringMid($UpdSeqArr,1,4)
 		Local $UpdSeqArrPart1 = StringMid($UpdSeqArr,5,4)
@@ -2698,6 +2784,8 @@ Func _GenDummyDataQ()
 	$partJ = "01"
 	$partK = "0000"
 	$DataQ[1] = $PartA & $PartB & $PartC & $PartD & $PartE & $PartF & $PartG & $PartH & $PartI & $PartJ & $PartK
+	$ClustersPerFileRecordSegment = Ceiling($MFT_Record_Size/$BytesPerCluster)
+	$BytesPerSector = 512
 EndFunc
 
 Func _ExtractSingleFile($MFTRecord, $FileRef)
@@ -2854,3 +2942,35 @@ Func _SelectCsv()
 	_DebugOut("Output CSV file: " & $csvfile)
 EndFunc
 
+Func _GetRunsFromAttributeListMFT0()
+	For $i = 1 To UBound($DataQ) - 1
+		_DecodeDataQEntry($DataQ[$i])
+		If $NonResidentFlag = '00' Then
+;			ConsoleWrite("Resident" & @CRLF)
+		Else
+			Global $RUN_VCN[1], $RUN_Clusters[1]
+			$TotalClusters = $DT_Clusters
+			$RealSize = $DT_RealSize		;preserve file sizes
+			If Not $InitState Then $DT_InitSize = $DT_RealSize
+			$InitSize = $DT_InitSize
+			_ExtractDataRuns()
+			If $TotalClusters * $BytesPerCluster >= $RealSize Then
+;				_ExtractFile($MFTRecord)
+			Else 		 ;code to handle attribute list
+				$Flag = $IsCompressed		;preserve compression state
+				For $j = $i + 1 To UBound($DataQ) -1
+					_DecodeDataQEntry($DataQ[$j])
+					$TotalClusters += $DT_Clusters
+					_ExtractDataRuns()
+					If $TotalClusters * $BytesPerCluster >= $RealSize Then
+						$DT_RealSize = $RealSize		;restore file sizes
+						$DT_InitSize = $InitSize
+						$IsCompressed = $Flag		;recover compression state
+						ExitLoop
+					EndIf
+				Next
+				$i = $j
+			EndIf
+		EndIf
+	Next
+EndFunc
