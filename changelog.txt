@@ -1,5 +1,7 @@
 Mft2Csv changelog
 
+v2.0.0.22. Fixed bug introduced in previous version 2.0.0.21 where clusters to keep across dataruns was incorrect (split MFT records).
+
 v2.0.0.21. Fixed bug when $MFT itself contained an $ATTRIBUTE_LIST. Fixed bug with handling records that was split across dataruns. Increased initialization size of array for runs and vcns which caused it to crash with extreme fragmentation.
 
 v2.0.0.20. Fixed bug that caused chosen date/time format to always be set to 2.
