@@ -2,7 +2,7 @@
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.22
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.23
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -106,7 +106,7 @@ Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
 
-$Form = GUICreate("MFT2CSV 2.0.0.22", 560, 450, -1, -1)
+$Form = GUICreate("MFT2CSV 2.0.0.23", 560, 450, -1, -1)
 GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
 
 $Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
@@ -2515,7 +2515,7 @@ If $DoDefaultAll Then
 ElseIf $dol2t Then
 	$csv_header = "Date"&$de&"Time"&$de&"Timezone"&$de&"MACB"&$de&"Source"&$de&"SourceType"&$de&"Type"&$de&"User"&$de&"Host"&$de&"Short"&$de&"Desc"&$de&"Version"&$de&"Filename"&$de&"Inode"&$de&"Notes"&$de&"Format"&$de&"Extra"
 ElseIf $DoBodyfile Then
-	$csv_header = "MD5"&$de&"name"&$de&"inode"&$de&"mode_as_string"&$de&"UID"&$de&"GID"&$de&"size"&$de&"atime"&$de&"mtime"&$de&"ctime"&$de&"crtime"
+	$csv_header = "MD5"&$de&"name"&$de&"inode"&$de&"mode_as_string"&$de&"UID"&$de&"GID"&$de&"size"&$de&"atime"&$de&"mtime"&$de&"ctime"&$de&"rtime"
 EndIf
 FileWriteLine($csv, $csv_header & @CRLF)
 EndFunc
