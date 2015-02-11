@@ -1,5 +1,7 @@
 Mft2Csv changelog
 
+v2.0.0.24. Added option to set millisec/precision separator in order to make timestamps Excel friendly.
+
 v2.0.0.23. Fixed an incorrect header name in the bodyfile output from crtime to rtime.
 
 v2.0.0.22. Fixed bug introduced in previous version 2.0.0.21 where clusters to keep across dataruns was incorrect (split MFT records).

@@ -9,7 +9,7 @@ Select which timezone the timestamps should be dumped to. Default is UTC 0.00.
 Select if fixups should be skipped or not. Default to off. Usually only applicable in very specific situations.
 Select if $MFT should be treated as broken. Default to off. Only applicable when using $MFT file as input. Should be used when fragments of $MFT is used and  $MFT is not in the first record.
 Select if resident data should be extracted. Default to off. Require to select the path to extract to.
-Select format of decoded timestamps, as well as the precision (None, MilliSec, NanoSec). Examples are displayed in GUI. Choose if extra timestamps are to be dumped to a seperate csv by ticking off "split csv".
+Select format of decoded timestamps, as well as the precision (None, MilliSec, NanoSec), and millisec/precision separator. Examples are displayed in GUI. Choose if extra timestamps are to be dumped to a seperate csv by ticking off "split csv".
 
 1. Parsing $MFT on the systemdrive from your running live system.
 Detected NTFS volumes will be displayed in the second combobox from the top. If new drive is attached or mounted, click "Rescan Mounted Drives". Select target volume in the second combo.

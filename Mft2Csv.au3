@@ -2,7 +2,7 @@
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.23
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.24
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -16,7 +16,7 @@
 ; by Joakim Schicht & Ddan
 ; parts by trancexxx, Ascend4nt & others
 
-Global $_COMMON_KERNEL32DLL=DllOpen("kernel32.dll"), $separator="|", $dol2t=False, $DoDefaultAll=False, $DoBodyfile=False, $SkipFixups=False, $MftIsBroken=False, $ExtractResident=False, $ExtractionPath, $DoSplitCsv=False, $csvextra, $style, $TimestampStart
+Global $_COMMON_KERNEL32DLL=DllOpen("kernel32.dll"), $separator="|", $PrecisionSeparator=".", $dol2t=False, $DoDefaultAll=False, $DoBodyfile=False, $SkipFixups=False, $MftIsBroken=False, $ExtractResident=False, $ExtractionPath, $DoSplitCsv=False, $csvextra, $style, $TimestampStart
 Global $csv, $csvfile, $RecordOffset, $Signature, $ADS, $FN_NamePath, $UTCconfig, $de=",", $MftFileSize, $FN_FileName, $LogicalClusterNumberforthefileMFT, $ClustersPerFileRecordSegment, $MftAttrListString, $BytesPerSector, $SplitMftRecArr[1]
 Global $HDR_LSN, $HDR_SequenceNo, $HDR_Flags, $HDR_RecRealSize, $HDR_RecAllocSize, $HDR_BaseRecord, $HDR_NextAttribID, $HDR_MFTREcordNumber, $HDR_HardLinkCount, $HDR_BaseRecSeqNo
 Global $SI_CTime, $SI_ATime, $SI_MTime, $SI_RTime, $SI_FilePermission, $SI_USN, $Errors, $DT_AllocSize, $DT_RealSize, $DT_InitStreamSize, $RecordSlackSpace
@@ -106,7 +106,7 @@ Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
 
-$Form = GUICreate("MFT2CSV 2.0.0.23", 560, 450, -1, -1)
+$Form = GUICreate("MFT2CSV 2.0.0.24", 560, 450, -1, -1)
 GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
 
 $Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
@@ -155,9 +155,14 @@ $LabelTimestampPrecision = GUICtrlCreateLabel("Precision:",150,168,50,20)
 $ComboTimestampPrecision = GUICtrlCreateCombo("", 200, 168, 70, 25)
 $CheckCsvSplit = GUICtrlCreateCheckbox("split csv", 280, 168, 60, 20)
 GUICtrlSetState($CheckCsvSplit, $GUI_UNCHECKED)
-$InputExampleTimestamp = GUICtrlCreateInput("",350,168,200,20)
+
+$LabelPrecisionSeparator = GUICtrlCreateLabel("Precision separator:",20,190,100,20)
+$PrecisionSeparatorInput = GUICtrlCreateInput($PrecisionSeparator,120,190,20,20)
+
+$InputExampleTimestamp = GUICtrlCreateInput("",350,190,200,20)
 GUICtrlSetState($InputExampleTimestamp, $GUI_DISABLE)
-$myctredit = GUICtrlCreateEdit("Decoding $MFT" & @CRLF, 0, 195, 560, 85, BitAND($ES_AUTOVSCROLL,$WS_VSCROLL))
+
+$myctredit = GUICtrlCreateEdit("Decoding $MFT" & @CRLF, 0, 215, 560, 65, BitAND($ES_AUTOVSCROLL,$WS_VSCROLL))
 _GetPhysicalDrives("PhysicalDrive")
 _GetMountedDrivesInfo()
 _InjectTimeZoneInfo()
@@ -171,6 +176,7 @@ GUISetState(@SW_SHOW, $Form)
 While Not $active
    Sleep(1000)	;Wait for event
    _TranslateSeparator()
+   $PrecisionSeparator = GUICtrlRead($PrecisionSeparatorInput)
    _TranslateTimestamp()
 WEnd
 
@@ -299,6 +305,14 @@ Func _ExtractSystemfile()
 		_DebugOut("ANSI configured")
 	EndIf
 	_SelectCsv()
+	If StringLen(GUICtrlRead($PrecisionSeparatorInput)) <> 1 Then
+		_DisplayInfo("Error: Separator not set properly" & @crlf)
+		_DebugOut("Error: Separator not set properly: " & GUICtrlRead($PrecisionSeparatorInput))
+		Return
+	Else
+		$PrecisionSeparator = GUICtrlRead($PrecisionSeparatorInput)
+		_DebugOut("Using precision separator: " & $PrecisionSeparator)
+	EndIf
 	_TranslateTimestamp()
 	If Int(GUICtrlRead($checkl2t) + GUICtrlRead($checkbodyfile) + GUICtrlRead($checkdefaultall)) <> 9 Then
 		_DebugOut("Error: Output format can only be one of the options (not more than 1).")
@@ -2752,7 +2766,8 @@ Func _WinTime_FormatTime($iYear,$iMonth,$iDay,$iHour,$iMin,$iSec,$iMilSec,$iDayO
 		$sDateTimeStr&=$iYear&' '&$sHH&':'&$sMin
 		If $iPrecision Then
 			$sDateTimeStr&=':'&$sSS
-			If $iPrecision>1 Then $sDateTimeStr&=':'&$sMS
+;			If $iPrecision>1 Then $sDateTimeStr&=':'&$sMS
+			If $iPrecision>1 Then $sDateTimeStr&=$PrecisionSeparator&$sMS
 		EndIf
 		$sDateTimeStr&=$sAMPM
 	EndIf
