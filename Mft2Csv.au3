@@ -1,8 +1,9 @@
 #RequireAdmin
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
+#AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.24
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.25
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -106,7 +107,7 @@ Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
 
-$Form = GUICreate("MFT2CSV 2.0.0.24", 560, 450, -1, -1)
+$Form = GUICreate("MFT2CSV 2.0.0.25", 560, 450, -1, -1)
 GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
 
 $Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
@@ -800,7 +801,7 @@ EndFunc
 
 Func _DecodeMFTRecord0($record, $FileRef)      ;produces DataQ
 	$MftAttrListString=","
-	$record = _DoFixup($record, $FileRef)
+	If Not $SkipFixups Then $record = _DoFixup($record, $FileRef)
 	If $record = "" then Return ""  ;corrupt, failed fixup
 	$RecordSize = Dec(_SwapEndian(StringMid($record,51,8)),2)
 	$AttributeOffset = (Dec(StringMid($record,43,2))*2)+3

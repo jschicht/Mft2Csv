@@ -1,5 +1,7 @@
 Mft2Csv changelog
 
+v2.0.0.25. Fixed bug that missed check for SkipFixups configuration.
+
 v2.0.0.24. Added option to set millisec/precision separator in order to make timestamps Excel friendly.
 
 v2.0.0.23. Fixed an incorrect header name in the bodyfile output from crtime to rtime.
