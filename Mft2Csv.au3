@@ -3,7 +3,7 @@
 #AutoIt3Wrapper_UseUpx=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.26
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.27
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -104,7 +104,7 @@ Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
 
-$Form = GUICreate("MFT2CSV 2.0.0.26", 560, 450, -1, -1)
+$Form = GUICreate("MFT2CSV 2.0.0.27", 560, 450, -1, -1)
 GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
 
 $Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
@@ -1958,38 +1958,50 @@ Func _Get_FileName($MFTEntry, $FN_Offset, $FN_Size, $FN_Number)
 	Return
 EndFunc   ;==>_Get_FileName
 
-Func _Get_ObjectID($MFTEntry, $OBJECTID_Offset, $OBJECTID_Size)
-	$GUID_ObjectID = StringMid($MFTEntry, $OBJECTID_Offset + 48, 32)
-	$GUID_ObjectID = StringMid($GUID_ObjectID, 1, 8) & "-" & StringMid($GUID_ObjectID, 9, 4) & "-" & StringMid($GUID_ObjectID, 13, 4) & "-" & StringMid($GUID_ObjectID, 17, 4) & "-" & StringMid($GUID_ObjectID, 21, 12)
-	If $OBJECTID_Size - 24 = 32 Then
-		$GUID_BirthVolumeID = StringMid($MFTEntry, $OBJECTID_Offset + 80, 32)
-		$GUID_BirthVolumeID = StringMid($GUID_BirthVolumeID, 1, 8) & "-" & StringMid($GUID_BirthVolumeID, 9, 4) & "-" & StringMid($GUID_BirthVolumeID, 13, 4) & "-" & StringMid($GUID_BirthVolumeID, 17, 4) & "-" & StringMid($GUID_BirthVolumeID, 21, 12)
-		$GUID_BirthObjectID = "NOT PRESENT"
-		$GUID_BirthDomainID = "NOT PRESENT"
-		Return
-	EndIf
-	If $OBJECTID_Size - 24 = 48 Then
-		$GUID_BirthVolumeID = StringMid($MFTEntry, $OBJECTID_Offset + 80, 32)
-		$GUID_BirthVolumeID = StringMid($GUID_BirthVolumeID, 1, 8) & "-" & StringMid($GUID_BirthVolumeID, 9, 4) & "-" & StringMid($GUID_BirthVolumeID, 13, 4) & "-" & StringMid($GUID_BirthVolumeID, 17, 4) & "-" & StringMid($GUID_BirthVolumeID, 21, 12)
-		$GUID_BirthObjectID = StringMid($MFTEntry, $OBJECTID_Offset + 112, 32)
-		$GUID_BirthObjectID = StringMid($GUID_BirthObjectID, 1, 8) & "-" & StringMid($GUID_BirthObjectID, 9, 4) & "-" & StringMid($GUID_BirthObjectID, 13, 4) & "-" & StringMid($GUID_BirthObjectID, 17, 4) & "-" & StringMid($GUID_BirthObjectID, 21, 12)
-		$GUID_BirthDomainID = "NOT PRESENT"
-		Return
-	EndIf
-	If $OBJECTID_Size - 24 = 64 Then
-		$GUID_BirthVolumeID = StringMid($MFTEntry, $OBJECTID_Offset + 80, 32)
-		$GUID_BirthVolumeID = StringMid($GUID_BirthVolumeID, 1, 8) & "-" & StringMid($GUID_BirthVolumeID, 9, 4) & "-" & StringMid($GUID_BirthVolumeID, 13, 4) & "-" & StringMid($GUID_BirthVolumeID, 17, 4) & "-" & StringMid($GUID_BirthVolumeID, 21, 12)
-		$GUID_BirthObjectID = StringMid($MFTEntry, $OBJECTID_Offset + 112, 32)
-		$GUID_BirthObjectID = StringMid($GUID_BirthObjectID, 1, 8) & "-" & StringMid($GUID_BirthObjectID, 9, 4) & "-" & StringMid($GUID_BirthObjectID, 13, 4) & "-" & StringMid($GUID_BirthObjectID, 17, 4) & "-" & StringMid($GUID_BirthObjectID, 21, 12)
-		$GUID_BirthDomainID = StringMid($MFTEntry, $OBJECTID_Offset + 144, 32)
-		$GUID_BirthDomainID = StringMid($GUID_BirthDomainID, 1, 8) & "-" & StringMid($GUID_BirthDomainID, 9, 4) & "-" & StringMid($GUID_BirthDomainID, 13, 4) & "-" & StringMid($GUID_BirthDomainID, 17, 4) & "-" & StringMid($GUID_BirthDomainID, 21, 12)
-		Return
-	EndIf
-	$GUID_BirthVolumeID = "NOT PRESENT"
-	$GUID_BirthObjectID = "NOT PRESENT"
-	$GUID_BirthDomainID = "NOT PRESENT"
-	Return
-EndFunc   ;==>_Get_ObjectID
+Func _Get_ObjectID($MFTEntry,$OBJECTID_Offset,$OBJECTID_Size)
+	$GUID_ObjectID = StringMid($MFTEntry,$OBJECTID_Offset+48,32)
+	$GUID_ObjectID = _HexToGuidStr($GUID_ObjectID,1)
+	Select
+		Case $OBJECTID_Size - 24 = 16
+			$GUID_BirthVolumeID = "NOT PRESENT"
+			$GUID_BirthObjectID = "NOT PRESENT"
+			$GUID_BirthDomainID = "NOT PRESENT"
+		Case $OBJECTID_Size - 24 = 32
+			$GUID_BirthVolumeID = StringMid($MFTEntry,$OBJECTID_Offset+80,32)
+			$GUID_BirthVolumeID = _HexToGuidStr($GUID_BirthVolumeID,1)
+			$GUID_BirthObjectID = "NOT PRESENT"
+			$GUID_BirthDomainID = "NOT PRESENT"
+		Case $OBJECTID_Size - 24 = 48
+			$GUID_BirthVolumeID = StringMid($MFTEntry,$OBJECTID_Offset+80,32)
+			$GUID_BirthVolumeID = _HexToGuidStr($GUID_BirthVolumeID,1)
+			$GUID_BirthObjectID = StringMid($MFTEntry,$OBJECTID_Offset+112,32)
+			$GUID_BirthObjectID = _HexToGuidStr($GUID_BirthObjectID,1)
+			$GUID_BirthDomainID = "NOT PRESENT"
+		Case $OBJECTID_Size - 24 = 64
+			$GUID_BirthVolumeID = StringMid($MFTEntry,$OBJECTID_Offset+80,32)
+			$GUID_BirthVolumeID = _HexToGuidStr($GUID_BirthVolumeID,1)
+			$GUID_BirthObjectID = StringMid($MFTEntry,$OBJECTID_Offset+112,32)
+			$GUID_BirthObjectID = _HexToGuidStr($GUID_BirthObjectID,1)
+			$GUID_BirthDomainID = StringMid($MFTEntry,$OBJECTID_Offset+144,32)
+			$GUID_BirthDomainID = _HexToGuidStr($GUID_BirthDomainID,1)
+		Case Else
+			ConsoleWrite("Error: The $OBJECT_ID size was unexpected." & @crlf)
+	EndSelect
+EndFunc
+
+Func _HexToGuidStr($input,$mode)
+	;{4b-2b-2b-2b-6b}
+	Local $OutStr
+	If Not StringLen($input) = 32 Then Return $input
+	If $mode Then $OutStr = "{"
+	$OutStr &= _SwapEndian(StringMid($input,1,8)) & "-"
+	$OutStr &= _SwapEndian(StringMid($input,9,4)) & "-"
+	$OutStr &= _SwapEndian(StringMid($input,13,4)) & "-"
+	$OutStr &= StringMid($input,17,4) & "-"
+	$OutStr &= StringMid($input,21,12)
+	If $mode Then $OutStr &= "}"
+	Return $OutStr
+EndFunc
 
 Func _Get_SecurityDescriptor()
 ;	ConsoleWrite("Get_SecurityDescriptor Function not implemented yet." & @CRLF)
