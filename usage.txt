@@ -63,3 +63,90 @@ Alternate data steams will have the name of the data stream prefixed with ADS_ a
 [0x00228400][DEL]import.reg[ADS_Zone.Identifier]
 
 
+Command line use
+If no parameters are supplied, the GUI will by default launch. Valid switches are:
+
+Switches:
+/Volume:
+Target volume in the form of c: (only Volume or MftFile should be used, not both).
+/MftFile:
+Input MFT file extracted (only Volume or MftFile should be used, not both)
+/ExtractResident:
+Boolean value for extracting resident data. Default is 0. Can be 0 or 1.
+/ExtractPath:
+The extraction path if extracting resident data. Defaults to program directory.
+/TimeZone:
+A string value for the timezone. See notes further down for valid values.
+/OutputFormat:
+The output format of csv. Valid values can be l2t, BodyFile, all.
+/BrokenMft:
+Boolean value for handling MFT's with bad format. Default is 0. Can be 0 or 1.
+/SkipFixups:
+Boolean value to skip fixups. Primarily used with memory dumps. Default is 0. Can be 0 or 1.
+/Separator:
+The separator to use in the csv. Default is |
+/QuotationMark:
+Boolean value for surrounding values in csv with quotes. Default is 0. Can be 0 or 1.
+/Unicode:
+Boolean value for decoding unicode strings. Default is 0. Can be 0 or 1.
+/TSFormat:
+An integer from 1 - 6 for specifying the timestamp format. Start the gui to see what they mean. Default is 6.
+/TSPrecision:
+What precision to use in the timestamp. Valid values are None, MilliSec and NanoSec. Default is NanoSec.
+/TSPrecisionSeparator:
+The separator to put in the separation of the precision. Default is ".". Start the gui to see what it means.
+/SplitCsv:
+Boolean value for specifying if csv is to be split. Default is 0. Can be 0 or 1.
+/RecordSize:
+The size of the MFT records. Valid values are 1024 and 4096. Default is 1024.
+
+
+The available TimeZone's to use are:
+-12.00
+-11.00
+-10.00
+-9.30
+-9.00
+-8.00
+-7.00
+-6.00
+-5.00
+-4.30
+-4.00
+-3.30
+-3.00
+-2.00
+-1.00
+0.00
+1.00
+2.00
+3.00
+3.30
+4.00
+4.30
+5.00
+5.30
+5.45
+6.00
+6.30
+7.00
+8.00
+8.45
+9.00
+9.30
+10.00
+10.30
+11.00
+11.30
+12.00
+12.45
+13.00
+14.00
+
+Examples:
+Mft2Csv.exe /MftFile:c:\temp\$MFT /TimeZone:2.00 /RecordSize:4096 /ExtractResident:1 /TSFormat:1 /TSPrecision:MilliSec /Unicode:1
+Mft2Csv.exe /MftFile:c:\temp\$MFT /TimeZone:-10.00 /RecordSize:4096 /ExtractResident:1 /TSFormat:4 /TSPrecision:NanoSec /Unicode:1
+Mft2Csv.exe /Volume:e: /TimeZone:3.00 /RecordSize:4096 /TSFormat:1 /TSPrecision:MilliSec
+Mft2Csv.exe /Volume:e: /TSFormat:2 /TSPrecision:None
+Mft2Csv.exe /MftFile:c:\temp\$MFT /ExtractResident:1 /ExtractPath:c:\temp\ResidentData
+

@@ -1,9 +1,10 @@
 #RequireAdmin
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_UseUpx=y
+#AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.27
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.28
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -102,125 +103,138 @@ Global $OverallProgress, $FileProgress, $CurrentProgress=-1, $ProgressStatus, $P
 
 Global Const $RecordSignature = '46494C45' ; FILE signature
 
-Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
+Global $myctredit, $CheckUnicode, $CheckCsvSplit, $checkFixups, $checkBrokenMFT, $checkl2t, $checkbodyfile, $checkdefaultall, $SeparatorInput, $checkquotes
 
-$Form = GUICreate("MFT2CSV 2.0.0.27", 560, 450, -1, -1)
-GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
-
-$Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
-$ComboPhysicalDrives = GUICtrlCreateCombo("", 180, 3, 305, 20)
-$buttonScanPhysicalDrives = GUICtrlCreateButton("Scan Physical", 5, 3, 80, 20)
-GUICtrlSetOnEvent($buttonScanPhysicalDrives, "_HandleEvent")
-$buttonScanShadowCopies = GUICtrlCreateButton("Scan Shadows", 90, 3, 80, 20)
-GUICtrlSetOnEvent($buttonScanShadowCopies, "_HandleEvent")
-$buttonTestPhysicalDrive = GUICtrlCreateButton("<-- Test it", 495, 3, 60, 20)
-GUICtrlSetOnEvent($buttonTestPhysicalDrive, "_HandleEvent")
-$buttonDrive = GUICtrlCreateButton("Rescan Mounted Drives", 425, 25, 130, 20)
-GUICtrlSetOnEvent($buttonDrive, "_HandleEvent")
-$checkFixups = GUICtrlCreateCheckbox("Skip Fixups", 335, 50, 95, 20)
-$checkBrokenMFT = GUICtrlCreateCheckbox("Broken $MFT", 335, 75, 95, 20)
-$checkExtractResident = GUICtrlCreateCheckbox("Extract Resident", 335, 100, 95, 20)
-$buttonImage = GUICtrlCreateButton("Choose Image", 440, 50, 100, 20)
-GUICtrlSetOnEvent($buttonImage, "_HandleEvent")
-$buttonMftFile = GUICtrlCreateButton("Choose $MFT", 440, 75, 100, 20)
-GUICtrlSetOnEvent($buttonMftFile, "_HandleEvent")
-;$buttonOutput = GUICtrlCreateButton("Choose CSV", 440, 100, 100, 20)
-;GUICtrlSetOnEvent($buttonOutput, "_HandleEvent")
-$buttonExtractedOut = GUICtrlCreateButton("Set Extract Path", 440, 100, 100, 20)
-GUICtrlSetOnEvent($buttonExtractedOut, "_HandleEvent")
-$buttonStart = GUICtrlCreateButton("Start Processing", 430, 125, 120, 40)
-GUICtrlSetOnEvent($buttonStart, "_HandleEvent")
-$Label1 = GUICtrlCreateLabel("Set decoded timestamps to specific region:",20,50,230,20)
-$Combo2 = GUICtrlCreateCombo("", 230, 50, 90, 25)
-GUICtrlCreateLabel("Set output format:",20,70,100,20)
-$checkl2t = GUICtrlCreateCheckbox("log2timeline", 120, 70, 130, 20)
-GUICtrlSetState($checkl2t, $GUI_UNCHECKED)
-$checkbodyfile = GUICtrlCreateCheckbox("bodyfile", 120, 90, 130, 20)
-GUICtrlSetState($checkbodyfile, $GUI_UNCHECKED)
-$checkdefaultall = GUICtrlCreateCheckbox("dump everything", 120, 110, 130, 20)
-GUICtrlSetState($checkdefaultall, $GUI_CHECKED)
-$LabelSeparator = GUICtrlCreateLabel("Set separator:",20,135,70,20)
-$SaparatorInput = GUICtrlCreateInput($separator,90,135,20,20)
-$SaparatorInput2 = GUICtrlCreateInput($separator,120,135,30,20)
-GUICtrlSetState($SaparatorInput2, $GUI_DISABLE)
-$checkquotes = GUICtrlCreateCheckbox("Quotation mark", 170, 135, 100, 20)
-GUICtrlSetState($checkquotes, $GUI_UNCHECKED)
-$CheckUnicode = GUICtrlCreateCheckbox("Unicode", 280, 135, 60, 20)
-GUICtrlSetState($CheckUnicode, $GUI_UNCHECKED)
-$LabelTimestampFormat = GUICtrlCreateLabel("Timestamp format:",20,168,90,20)
-$ComboTimestampFormat = GUICtrlCreateCombo("", 110, 168, 30, 25)
-$LabelTimestampPrecision = GUICtrlCreateLabel("Precision:",150,168,50,20)
-$ComboTimestampPrecision = GUICtrlCreateCombo("", 200, 168, 70, 25)
-$CheckCsvSplit = GUICtrlCreateCheckbox("split csv", 280, 168, 60, 20)
-GUICtrlSetState($CheckCsvSplit, $GUI_UNCHECKED)
-
-$LabelPrecisionSeparator = GUICtrlCreateLabel("Precision separator:",20,190,100,20)
-$PrecisionSeparatorInput = GUICtrlCreateInput($PrecisionSeparator,120,190,20,20)
-
-$InputExampleTimestamp = GUICtrlCreateInput("",350,190,200,20)
-GUICtrlSetState($InputExampleTimestamp, $GUI_DISABLE)
-
-$myctredit = GUICtrlCreateEdit("Decoding $MFT" & @CRLF, 0, 215, 560, 65, BitAND($ES_AUTOVSCROLL,$WS_VSCROLL))
-_GetPhysicalDrives("PhysicalDrive")
-_GetMountedDrivesInfo()
-_InjectTimeZoneInfo()
-_InjectTimestampFormat()
-_InjectTimestampPrecision()
-_TranslateTimestamp()
-
-$LogState = True
-GUISetState(@SW_SHOW, $Form)
-
-While Not $active
-   Sleep(1000)	;Wait for event
-   _TranslateSeparator()
-   $PrecisionSeparator = GUICtrlRead($PrecisionSeparatorInput)
-   _TranslateTimestamp()
-WEnd
-
-$tDelta = _GetUTCRegion()-$tDelta
-If @error Then
-	_DisplayInfo("Error: Timezone configuration failed." & @CRLF)
+If $cmdline[0] > 0 Then
+	$CommandlineMode = 1
+	ConsoleWrite("Mft2Csv 2.0.0.28" & @CRLF)
+	$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
+	$logfile = FileOpen(@ScriptDir & "\" & $TimestampStart & ".log",2+32)
+	_GetInputParams()
 Else
-	_DisplayInfo("Timestamps presented in UTC: " & $UTCconfig & @CRLF)
+	$CommandlineMode = 0
+
+	Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
+
+	$Form = GUICreate("MFT2CSV 2.0.0.28", 560, 450, -1, -1)
+	GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
+
+	$Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
+	$ComboPhysicalDrives = GUICtrlCreateCombo("", 180, 3, 305, 20)
+	$buttonScanPhysicalDrives = GUICtrlCreateButton("Scan Physical", 5, 3, 80, 20)
+	GUICtrlSetOnEvent($buttonScanPhysicalDrives, "_HandleEvent")
+	$buttonScanShadowCopies = GUICtrlCreateButton("Scan Shadows", 90, 3, 80, 20)
+	GUICtrlSetOnEvent($buttonScanShadowCopies, "_HandleEvent")
+	$buttonTestPhysicalDrive = GUICtrlCreateButton("<-- Test it", 495, 3, 60, 20)
+	GUICtrlSetOnEvent($buttonTestPhysicalDrive, "_HandleEvent")
+	$buttonDrive = GUICtrlCreateButton("Rescan Mounted Drives", 425, 25, 130, 20)
+	GUICtrlSetOnEvent($buttonDrive, "_HandleEvent")
+	$checkFixups = GUICtrlCreateCheckbox("Skip Fixups", 335, 50, 95, 20)
+	$checkBrokenMFT = GUICtrlCreateCheckbox("Broken $MFT", 335, 75, 95, 20)
+	$checkExtractResident = GUICtrlCreateCheckbox("Extract Resident", 335, 100, 95, 20)
+	$buttonImage = GUICtrlCreateButton("Choose Image", 440, 50, 100, 20)
+	GUICtrlSetOnEvent($buttonImage, "_HandleEvent")
+	$buttonMftFile = GUICtrlCreateButton("Choose $MFT", 440, 75, 100, 20)
+	GUICtrlSetOnEvent($buttonMftFile, "_HandleEvent")
+	;$buttonOutput = GUICtrlCreateButton("Choose CSV", 440, 100, 100, 20)
+	;GUICtrlSetOnEvent($buttonOutput, "_HandleEvent")
+	$buttonExtractedOut = GUICtrlCreateButton("Set Extract Path", 440, 100, 100, 20)
+	GUICtrlSetOnEvent($buttonExtractedOut, "_HandleEvent")
+	$buttonStart = GUICtrlCreateButton("Start Processing", 430, 125, 120, 40)
+	GUICtrlSetOnEvent($buttonStart, "_HandleEvent")
+	$Label1 = GUICtrlCreateLabel("Set decoded timestamps to specific region:",20,50,230,20)
+	$Combo2 = GUICtrlCreateCombo("", 230, 50, 90, 25)
+	GUICtrlCreateLabel("Set output format:",20,70,100,20)
+	$checkl2t = GUICtrlCreateCheckbox("log2timeline", 120, 70, 130, 20)
+	GUICtrlSetState($checkl2t, $GUI_UNCHECKED)
+	$checkbodyfile = GUICtrlCreateCheckbox("bodyfile", 120, 90, 130, 20)
+	GUICtrlSetState($checkbodyfile, $GUI_UNCHECKED)
+	$checkdefaultall = GUICtrlCreateCheckbox("dump everything", 120, 110, 130, 20)
+	GUICtrlSetState($checkdefaultall, $GUI_CHECKED)
+	$LabelSeparator = GUICtrlCreateLabel("Set separator:",20,135,70,20)
+	$SeparatorInput = GUICtrlCreateInput($separator,90,135,20,20)
+	$SeparatorInput2 = GUICtrlCreateInput($separator,120,135,30,20)
+	GUICtrlSetState($SeparatorInput2, $GUI_DISABLE)
+	$checkquotes = GUICtrlCreateCheckbox("Quotation mark", 170, 135, 100, 20)
+	GUICtrlSetState($checkquotes, $GUI_UNCHECKED)
+	$CheckUnicode = GUICtrlCreateCheckbox("Unicode", 280, 135, 60, 20)
+	GUICtrlSetState($CheckUnicode, $GUI_UNCHECKED)
+	$LabelTimestampFormat = GUICtrlCreateLabel("Timestamp format:",20,168,90,20)
+	$ComboTimestampFormat = GUICtrlCreateCombo("", 110, 168, 30, 25)
+	$LabelTimestampPrecision = GUICtrlCreateLabel("Precision:",150,168,50,20)
+	$ComboTimestampPrecision = GUICtrlCreateCombo("", 200, 168, 70, 25)
+	$CheckCsvSplit = GUICtrlCreateCheckbox("split csv", 280, 168, 60, 20)
+	GUICtrlSetState($CheckCsvSplit, $GUI_UNCHECKED)
+
+	$LabelPrecisionSeparator = GUICtrlCreateLabel("Precision separator:",20,190,100,20)
+	$PrecisionSeparatorInput = GUICtrlCreateInput($PrecisionSeparator,120,190,20,20)
+
+	$InputExampleTimestamp = GUICtrlCreateInput("",350,190,200,20)
+	GUICtrlSetState($InputExampleTimestamp, $GUI_DISABLE)
+
+	$myctredit = GUICtrlCreateEdit("Decoding $MFT" & @CRLF, 0, 215, 560, 65, BitAND($ES_AUTOVSCROLL,$WS_VSCROLL))
+	_GetPhysicalDrives("PhysicalDrive")
+	_GetMountedDrivesInfo()
+	_InjectTimeZoneInfo()
+	_InjectTimestampFormat()
+	_InjectTimestampPrecision()
+	_TranslateTimestamp()
+
+	$LogState = True
+	GUISetState(@SW_SHOW, $Form)
+
+	While Not $active
+	   Sleep(1000)	;Wait for event
+	   _TranslateSeparator()
+	   $PrecisionSeparator = GUICtrlRead($PrecisionSeparatorInput)
+	   _TranslateTimestamp()
+	WEnd
+
+	$tDelta = _GetUTCRegion(GUICtrlRead($Combo2))-$tDelta
+	If @error Then
+		_DisplayInfo("Error: Timezone configuration failed." & @CRLF)
+	Else
+		_DisplayInfo("Timestamps presented in UTC: " & $UTCconfig & @CRLF)
+	EndIf
+	$tDelta = $tDelta*-1 ;Since delta is substracted from timestamp later on
+
+	$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
+	$logfile = FileOpen(@ScriptDir & "\" & $TimestampStart & ".log",2+32)
+	$subset = 0
+
+	Select
+		Case $IsImage
+			$ImageOffset = Int(StringMid(GUICtrlRead($Combo),10),2)
+			_DisplayInfo(@CRLF & "Target is: " & GUICtrlRead($Combo) & @CRLF)
+			_DebugOut("Target image file: " & $TargetImageFile)
+			$hDisk = _WinAPI_CreateFile("\\.\" & $TargetImageFile,2,2,7)
+			If $hDisk = 0 Then _DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
+		Case $IsMftFile
+			_DebugOut("Target $MFT file: " & $TargetMftFile)
+			$hDisk = _WinAPI_CreateFile("\\.\" & $TargetMftFile,2,2,7)
+			If $hDisk = 0 Then _DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
+			$MftFileSize = _WinAPI_GetFileSizeEx($hDisk)
+		Case $IsPhysicalDrive=True
+			$ImageOffset = Int(StringMid(GUICtrlRead($Combo),10),2)
+			_DebugOut("Target is: \\.\" & $TargetImageFile)
+			$hDisk = _WinAPI_CreateFile("\\.\" & $TargetImageFile,2,2,7)
+			If $hDisk = 0 Then _DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
+		Case $IsShadowCopy = True
+			$TargetDrive = "SC"&StringMid($TargetImageFile,47)
+			$ImageOffset = Int(StringMid(GUICtrlRead($Combo),10),2)
+			_DebugOut("Target drive is: " & $TargetImageFile)
+			_DebugOut("Volume at offset: " & $ImageOffset)
+			$hDisk = _WinAPI_CreateFile("\\.\" & $TargetImageFile,2,2,7)
+			If $hDisk = 0 Then _DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
+		Case Else
+	;	Case $IsPhysicalDrive=False
+			$TargetDrive = StringMid(GUICtrlRead($Combo),1,2)
+			_DebugOut("Target volume: " & $TargetDrive)
+			$hDisk = _WinAPI_CreateFile("\\.\" & $TargetDrive,2,2,7)
+			If $hDisk = 0 Then _DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
+	EndSelect
+
 EndIf
-$tDelta = $tDelta*-1 ;Since delta is substracted from timestamp later on
-
-$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
-$logfile = FileOpen(@ScriptDir & "\" & $TimestampStart & ".log",2+32)
-$subset = 0
-
-Select
-	Case $IsImage
-		$ImageOffset = Int(StringMid(GUICtrlRead($Combo),10),2)
-		_DisplayInfo(@CRLF & "Target is: " & GUICtrlRead($Combo) & @CRLF)
-		_DebugOut("Target image file: " & $TargetImageFile)
-		$hDisk = _WinAPI_CreateFile("\\.\" & $TargetImageFile,2,2,7)
-		If $hDisk = 0 Then _DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
-	Case $IsMftFile
-		_DebugOut("Target $MFT file: " & $TargetMftFile)
-		$hDisk = _WinAPI_CreateFile("\\.\" & $TargetMftFile,2,2,7)
-		If $hDisk = 0 Then _DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
-		$MftFileSize = _WinAPI_GetFileSizeEx($hDisk)
-	Case $IsPhysicalDrive=True
-		$ImageOffset = Int(StringMid(GUICtrlRead($Combo),10),2)
-		_DebugOut("Target is: \\.\" & $TargetImageFile)
-		$hDisk = _WinAPI_CreateFile("\\.\" & $TargetImageFile,2,2,7)
-		If $hDisk = 0 Then _DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
-	Case $IsShadowCopy = True
-		$TargetDrive = "SC"&StringMid($TargetImageFile,47)
-		$ImageOffset = Int(StringMid(GUICtrlRead($Combo),10),2)
-		_DebugOut("Target drive is: " & $TargetImageFile)
-		_DebugOut("Volume at offset: " & $ImageOffset)
-		$hDisk = _WinAPI_CreateFile("\\.\" & $TargetImageFile,2,2,7)
-		If $hDisk = 0 Then _DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
-	Case Else
-;	Case $IsPhysicalDrive=False
-		$TargetDrive = StringMid(GUICtrlRead($Combo),1,2)
-		_DebugOut("Target volume: " & $TargetDrive)
-		$hDisk = _WinAPI_CreateFile("\\.\" & $TargetDrive,2,2,7)
-		If $hDisk = 0 Then _DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
-EndSelect
 
 _DebugOut("Timestamps presented in UTC " & $UTCconfig)
 _DebugOut("Operation started: " & $TimestampStart)
@@ -295,58 +309,114 @@ Func _ExtractSystemfile()
 	Local $nBytes
 	Global $DataQ[1], $RUN_VCN[1], $RUN_Clusters[1]
 	$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
-	If GUICtrlRead($CheckUnicode) = 1 Then
+
+	If $CommandlineMode Then
+		$CheckUnicode = $CheckUnicode
+	Else
+		$CheckUnicode = GUICtrlRead($CheckUnicode)
+	EndIf
+	If $CheckUnicode = 1 Then
 		$EncodingWhenOpen = 2+32
 		_DebugOut("UNICODE configured")
 	Else
 		$EncodingWhenOpen = 2
 		_DebugOut("ANSI configured")
 	EndIf
+
 	_SelectCsv()
-	If StringLen(GUICtrlRead($PrecisionSeparatorInput)) <> 1 Then
-		_DisplayInfo("Error: Separator not set properly" & @crlf)
-		_DebugOut("Error: Separator not set properly: " & GUICtrlRead($PrecisionSeparatorInput))
-		Return
+
+	If $CommandlineMode Then
+		$PrecisionSeparator = $PrecisionSeparator
 	Else
 		$PrecisionSeparator = GUICtrlRead($PrecisionSeparatorInput)
+	EndIf
+	If StringLen($PrecisionSeparator) <> 1 Then
+		If Not $CommandlineMode Then _DisplayInfo("Error: Precision separator not set properly" & @crlf)
+		_DebugOut("Error: Precision separator not set properly: " & $PrecisionSeparator)
+		Return
+	Else
 		_DebugOut("Using precision separator: " & $PrecisionSeparator)
 	EndIf
-	_TranslateTimestamp()
-	If Int(GUICtrlRead($checkl2t) + GUICtrlRead($checkbodyfile) + GUICtrlRead($checkdefaultall)) <> 9 Then
-		_DebugOut("Error: Output format can only be one of the options (not more than 1).")
-		Return
+
+	If Not $CommandlineMode Then _TranslateTimestamp()
+
+	If Not $CommandlineMode Then
+		If Int(GUICtrlRead($checkl2t) + GUICtrlRead($checkbodyfile) + GUICtrlRead($checkdefaultall)) <> 9 Then
+			_DebugOut("Error: Output format can only be one of the options (not more than 1).")
+			Return
+		EndIf
 	EndIf
-	If GUICtrlRead($CheckCsvSplit) = 1 Then
+
+	If $CommandlineMode Then
+		$CheckCsvSplit = $CheckCsvSplit
+	Else
+		$CheckCsvSplit = GUICtrlRead($CheckCsvSplit)
+	EndIf
+	If $CheckCsvSplit = 1 Then
 		$DoSplitCsv = True
 		_DebugOut("Splitting csv")
 	EndIf
-	If GUICtrlRead($checkFixups) = 1 Then
+
+	If $CommandlineMode Then
+		$checkFixups = $checkFixups
+	Else
+		$checkFixups = GUICtrlRead($checkFixups)
+	EndIf
+	If $checkFixups = 1 Then
 		$SkipFixups = True
 		_DebugOut("Skipping Fixups")
 	EndIf
-	If GUICtrlRead($checkBrokenMFT) = 1 Then
+
+	If $CommandlineMode Then
+		$checkBrokenMFT = $checkBrokenMFT
+	Else
+		$checkBrokenMFT = GUICtrlRead($checkBrokenMFT)
+	EndIf
+	If $checkBrokenMFT = 1 Then
 		$MftIsBroken = True
 		_DebugOut("Handling broken $MFT")
 	EndIf
-	If GUICtrlRead($checkl2t) = 1 Then
+
+	If $CommandlineMode Then
+		$checkl2t = $checkl2t
+		$checkbodyfile = $checkbodyfile
+		$checkdefaultall = $checkdefaultall
+	Else
+		$checkl2t = GUICtrlRead($checkl2t)
+		$checkbodyfile = GUICtrlRead($checkbodyfile)
+		$checkdefaultall = GUICtrlRead($checkdefaultall)
+	EndIf
+	If $checkl2t = 1 Then
 		$Dol2t = True
 		_DebugOut("Using output format: log2timeline")
-	ElseIf GUICtrlRead($checkbodyfile) = 1 Then
+	ElseIf $checkbodyfile = 1 Then
 		$DoBodyfile = True
 		_DebugOut("Using output format: bodyfile")
-	ElseIf GUICtrlRead($checkdefaultall) = 1 Then
+	ElseIf $checkdefaultall = 1 Then
 		$DoDefaultAll = True
 		_DebugOut("Using output format: all")
 	EndIf
-	If StringLen(GUICtrlRead($SaparatorInput)) <> 1 Then
-		_DisplayInfo("Error: Separator not set properly" & @crlf)
-		_DebugOut("Error: Separator not set properly: " & GUICtrlRead($SaparatorInput))
+
+	If $CommandlineMode Then
+		$SeparatorInput = $SeparatorInput
+	Else
+		$SeparatorInput = GUICtrlRead($SeparatorInput)
+	EndIf
+	If StringLen($SeparatorInput) <> 1 Then
+		If Not $CommandlineMode Then _DisplayInfo("Error: Separator not set properly" & @crlf)
+		_DebugOut("Error: Separator not set properly: " & $SeparatorInput)
 		Return
 	Else
-		$de = GUICtrlRead($SaparatorInput)
+		$de = $SeparatorInput
 		_DebugOut("Using separator: " & $de)
 	EndIf
-	If GUICtrlRead($checkquotes) = 1 Then
+
+	If $CommandlineMode Then
+		$checkquotes = $checkquotes
+	Else
+		$checkquotes = GUICtrlRead($checkquotes)
+	EndIf
+	If $checkquotes = 1 Then
 		_DebugOut("Writing variables surrounded with qoutes")
 	Else
 		_DebugOut("Writing variables without surrounding qoutes")
@@ -356,10 +426,10 @@ Func _ExtractSystemfile()
 	If $DoSplitCsv Then _WriteCSVExtraHeader()
 	If (Not $IsImage and Not $IsMftFile and Not $IsShadowCopy) Then
 		If DriveGetFileSystem($TargetDrive) <> "NTFS" Then		;read boot sector and extract $MFT data
-			_DisplayInfo("Error: Target volume " & $TargetDrive & " is not NTFS" & @crlf)
+			If Not $CommandlineMode Then _DisplayInfo("Error: Target volume " & $TargetDrive & " is not NTFS" & @crlf)
 			Return
 		EndIf
-		_DisplayInfo("Target volume is: " & $TargetDrive & @crlf)
+		If Not $CommandlineMode Then _DisplayInfo("Target volume is: " & $TargetDrive & @crlf)
 	EndIf
 
 	If Not $IsMftFile Then _WinAPI_SetFilePointerEx($hDisk, $ImageOffset, $FILE_BEGIN)
@@ -457,7 +527,7 @@ Func _ExtractSystemfile()
 			$Signature = "ZERO"
 			$RecordOffset = "0x" & Hex($RecordOffsetDec)
 			If $DoDefaultAll Then
-				If GUICtrlRead($checkquotes) = 1 Then
+				If $checkquotes = 1 Then
 					_WriteCSVwithQuotes()
 					If $DoSplitCsv Then _WriteCSVExtraWithQuotes()
 				Else
@@ -465,7 +535,7 @@ Func _ExtractSystemfile()
 					If $DoSplitCsv Then _WriteCSVExtra()
 				Endif
 			Else
-				If GUICtrlRead($checkquotes) = 1 Then
+				If $checkquotes = 1 Then
 					_WriteCSV2withQuotes()
 				Else
 					_WriteCSV2()
@@ -478,7 +548,7 @@ Func _ExtractSystemfile()
 			$Signature = "UNKNOWN"
 			$RecordOffset = "0x" & Hex($RecordOffsetDec)
 			If $DoDefaultAll Then
-				If GUICtrlRead($checkquotes) = 1 Then
+				If $checkquotes = 1 Then
 					_WriteCSVwithQuotes()
 					If $DoSplitCsv Then _WriteCSVExtraWithQuotes()
 				Else
@@ -486,7 +556,7 @@ Func _ExtractSystemfile()
 					If $DoSplitCsv Then _WriteCSVExtra()
 				Endif
 			Else
-				If GUICtrlRead($checkquotes) = 1 Then
+				If $checkquotes = 1 Then
 					_WriteCSV2withQuotes()
 				Else
 					_WriteCSV2()
@@ -504,7 +574,7 @@ Func _ExtractSystemfile()
 		$RecordOffset = "0x" & Hex($RecordOffsetDec)
 		$CTimeTest = _Test_SI2FN_CTime($SI_CTime, $FN_CTime)
 		If $DoDefaultAll Then
-			If GUICtrlRead($checkquotes) = 1 Then
+			If $checkquotes = 1 Then
 				_WriteCSVwithQuotes()
 				If $DoSplitCsv Then _WriteCSVExtraWithQuotes()
 			Else
@@ -512,7 +582,7 @@ Func _ExtractSystemfile()
 				If $DoSplitCsv Then _WriteCSVExtra()
 			Endif
 		Else
-			If GUICtrlRead($checkquotes) = 1 Then
+			If $checkquotes = 1 Then
 				_WriteCSV2withQuotes()
 			Else
 				_WriteCSV2()
@@ -523,7 +593,7 @@ Func _ExtractSystemfile()
 	_WinAPI_CloseHandle($hDisk)
 	AdlibUnRegister()
 	GUIDelete($Progress)
-	_DisplayInfo("Finished processing " & $Total & " records" & @crlf)
+	If Not $CommandlineMode Then _DisplayInfo("Finished processing " & $Total & " records" & @crlf)
 	_DebugOut("Finished processing " & $Total & " records.")
 EndFunc
 
@@ -2611,10 +2681,14 @@ $Regions = "UTC: -12.00|" & _
 GUICtrlSetData($Combo2,$Regions,"UTC: 0.00")
 EndFunc
 
-Func _GetUTCRegion()
-	$UTCRegion = GUICtrlRead($Combo2)
+Func _GetUTCRegion($UTCRegion)
 	If $UTCRegion = "" Then Return SetError(1,0,0)
-	$part1 = StringMid($UTCRegion,StringInStr($UTCRegion," ")+1)
+
+	If StringInStr($UTCRegion,"UTC:") Then
+		$part1 = StringMid($UTCRegion,StringInStr($UTCRegion," ")+1)
+	Else
+		$part1 = $UTCRegion
+	EndIf
 	Global $UTCconfig = $part1
 	If StringRight($part1,2) = "15" Then $part1 = StringReplace($part1,".15",".25")
 	If StringRight($part1,2) = "30" Then $part1 = StringReplace($part1,".30",".50")
@@ -2804,8 +2878,8 @@ EndFunc
 
 Func _TranslateSeparator()
 	; Or do it the other way around to allow setting other trickier separators, like specifying it in hex
-	GUICtrlSetData($SaparatorInput,StringLeft(GUICtrlRead($SaparatorInput),1))
-	GUICtrlSetData($SaparatorInput2,"0x"&Hex(Asc(GUICtrlRead($SaparatorInput)),2))
+	GUICtrlSetData($SeparatorInput,StringLeft(GUICtrlRead($SeparatorInput),1))
+	GUICtrlSetData($SeparatorInput2,"0x"&Hex(Asc(GUICtrlRead($SeparatorInput)),2))
 EndFunc
 
 Func _GenDummyDataQ()
@@ -2901,7 +2975,7 @@ Func _GetPhysicalDrives($InputDevice)
 	$Entries = ''
 	GUICtrlSetData($ComboPhysicalDrives,"","")
 	$sDrivePath = '\\.\'&$InputDevice
-	ConsoleWrite("$sDrivePath: " & $sDrivePath & @CRLF)
+;	ConsoleWrite("$sDrivePath: " & $sDrivePath & @CRLF)
 	Do
 		$hFile0 = _WinAPI_CreateFile($sDrivePath & $i,2,2,2)
 		If $hFile0 <> 0 Then
@@ -3012,4 +3086,168 @@ Func _GetRunsFromAttributeListMFT0()
 			EndIf
 		EndIf
 	Next
+EndFunc
+
+Func _GetInputParams()
+	Local $TimeZone, $OutputFormat
+	For $i = 1 To $cmdline[0]
+		;ConsoleWrite("Param " & $i & ": " & $cmdline[$i] & @CRLF)
+		If StringLeft($cmdline[$i],8) = "/Volume:" Then $TargetDrive = StringMid($cmdline[$i],9)
+		If StringLeft($cmdline[$i],9) = "/MftFile:" Then $TargetMftFile = StringMid($cmdline[$i],10)
+		If StringLeft($cmdline[$i],13) = "/ExtractPath:" Then $ExtractionPath = StringMid($cmdline[$i],14)
+		If StringLeft($cmdline[$i],17) = "/ExtractResident:" Then $ExtractResident = StringMid($cmdline[$i],19)
+		If StringLeft($cmdline[$i],10) = "/TimeZone:" Then $TimeZone = StringMid($cmdline[$i],11)
+		If StringLeft($cmdline[$i],14) = "/OutputFormat:" Then $OutputFormat = StringMid($cmdline[$i],15)
+		If StringLeft($cmdline[$i],12) = "/SkipFixups:" Then $checkFixups = StringMid($cmdline[$i],13)
+		If StringLeft($cmdline[$i],11) = "/BrokenMft:" Then $checkBrokenMFT = StringMid($cmdline[$i],12)
+		If StringLeft($cmdline[$i],11) = "/Separator:" Then $SeparatorInput = StringMid($cmdline[$i],12)
+		If StringLeft($cmdline[$i],15) = "/QuotationMark:" Then $checkquotes = StringMid($cmdline[$i],16)
+		If StringLeft($cmdline[$i],9) = "/Unicode:" Then $CheckUnicode = StringMid($cmdline[$i],10)
+		If StringLeft($cmdline[$i],10) = "/TSFormat:" Then $DateTimeFormat = StringMid($cmdline[$i],11)
+		If StringLeft($cmdline[$i],13) = "/TSPrecision:" Then $TimestampPrecision = StringMid($cmdline[$i],14)
+		If StringLeft($cmdline[$i],22) = "/TSPrecisionSeparator:" Then $PrecisionSeparator = StringMid($cmdline[$i],23)
+		If StringLeft($cmdline[$i],10) = "/SplitCsv:" Then $CheckCsvSplit = StringMid($cmdline[$i],11)
+		If StringLeft($cmdline[$i],12) = "/RecordSize:" Then $MFT_Record_Size = StringMid($cmdline[$i],13)
+	Next
+
+	If $MFT_Record_Size <> 4096 Then $MFT_Record_Size = 1024
+
+	If StringLen($TimeZone) > 0 Then
+		Select
+			Case $TimeZone = "-12.00"
+			Case $TimeZone = "-11.00"
+			Case $TimeZone = "-10.00"
+			Case $TimeZone = "-9.30"
+			Case $TimeZone = "-9.00"
+			Case $TimeZone = "-8.00"
+			Case $TimeZone = "-7.00"
+			Case $TimeZone = "-6.00"
+			Case $TimeZone = "-5.00"
+			Case $TimeZone = "-4.30"
+			Case $TimeZone = "-4.00"
+			Case $TimeZone = "-3.30"
+			Case $TimeZone = "-3.00"
+			Case $TimeZone = "-2.00"
+			Case $TimeZone = "-1.00"
+			Case $TimeZone = "0.00"
+			Case $TimeZone = "1.00"
+			Case $TimeZone = "2.00"
+			Case $TimeZone = "3.00"
+			Case $TimeZone = "3.30"
+			Case $TimeZone = "4.00"
+			Case $TimeZone = "4.30"
+			Case $TimeZone = "5.00"
+			Case $TimeZone = "5.30"
+			Case $TimeZone = "5.45"
+			Case $TimeZone = "6.00"
+			Case $TimeZone = "6.30"
+			Case $TimeZone = "7.00"
+			Case $TimeZone = "8.00"
+			Case $TimeZone = "8.45"
+			Case $TimeZone = "9.00"
+			Case $TimeZone = "9.30"
+			Case $TimeZone = "10.00"
+			Case $TimeZone = "10.30"
+			Case $TimeZone = "11.00"
+			Case $TimeZone = "11.30"
+			Case $TimeZone = "12.00"
+			Case $TimeZone = "12.45"
+			Case $TimeZone = "13.00"
+			Case $TimeZone = "14.00"
+			Case Else
+				$TimeZone = "0.00"
+		EndSelect
+	Else
+		$TimeZone = "0.00"
+	EndIf
+
+	$tDelta = _GetUTCRegion($TimeZone)-$tDelta
+	If @error Then
+		_DisplayInfo("Error: Timezone configuration failed." & @CRLF)
+	Else
+		_DisplayInfo("Timestamps presented in UTC: " & $UTCconfig & @CRLF)
+	EndIf
+	$tDelta = $tDelta*-1
+
+	$IsPhysicalDrive = 0
+	$IsImage = 0
+	$IsShadowCopy = 0
+	$IsMftFile = 0
+
+	If StringLen($TargetMftFile) > 0 Then
+		If Not FileExists($TargetMftFile) Then
+			ConsoleWrite("Error input $MFT file does not exist." & @CRLF)
+			Exit
+		EndIf
+		$IsMftFile = 1
+		$hDisk = _WinAPI_CreateFile("\\.\" & $TargetMftFile,2,2,7)
+		If $hDisk = 0 Then
+			_DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
+			Exit
+		EndIf
+		$MftFileSize = _WinAPI_GetFileSizeEx($hDisk)
+	EndIf
+
+	If StringLen($TargetDrive) > 0 Then
+		If $IsMftFile Then
+			ConsoleWrite("Error multiple input files" & @CRLF)
+			Exit
+		EndIf
+		If StringLen($TargetDrive) <> 2 Then
+			ConsoleWrite("Error input volume in bad format." & @CRLF)
+			Exit
+		EndIf
+		$hDisk = _WinAPI_CreateFile("\\.\" & $TargetDrive,2,2,7)
+		If $hDisk = 0 Then
+			_DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
+			Exit
+		EndIf
+	EndIf
+
+	If Not $hDisk Then
+		_DebugOut("Error obtaining a handle on input file or volume.")
+		Exit
+	EndIf
+
+	If StringLen($OutputFormat) > 0 Then
+		If $OutputFormat = "l2t" Then $checkl2t = 1
+		If $OutputFormat = "bodyfile" Then $checkbodyfile = 1
+		If $OutputFormat = "all" Then $checkdefaultall = 1
+		If $checkl2t + $checkbodyfile = 0 Then $checkdefaultall = 1
+	Else
+		$checkdefaultall = 1
+	EndIf
+
+	If $ExtractResident Then
+		If Not FileExists($ExtractionPath) Then
+			$ExtractionPath = @ScriptDir
+		EndIf
+	EndIf
+
+	If StringLen($PrecisionSeparator) <> 1 Then $PrecisionSeparator = "."
+	If StringLen($SeparatorInput) <> 1 Then $SeparatorInput = "|"
+
+	If StringLen($TimestampPrecision) > 0 Then
+		Select
+			Case $TimestampPrecision = "None"
+				_DebugOut("Timestamp Precision: " & $TimestampPrecision)
+				$TimestampPrecision = 1
+			Case $TimestampPrecision = "MilliSec"
+				_DebugOut("Timestamp Precision: " & $TimestampPrecision)
+				$TimestampPrecision = 2
+			Case $TimestampPrecision = "NanoSec"
+				_DebugOut("Timestamp Precision: " & $TimestampPrecision)
+				$TimestampPrecision = 3
+		EndSelect
+	Else
+		$TimestampPrecision = 1
+	EndIf
+
+	If StringLen($DateTimeFormat) > 0 Then
+		If $DateTimeFormat <> 1 And $DateTimeFormat <> 2 And $DateTimeFormat <> 3 And $DateTimeFormat <> 4 And $DateTimeFormat <> 5 And $DateTimeFormat <> 6 Then
+			$DateTimeFormat = 6
+		EndIf
+	Else
+		$DateTimeFormat = 6
+	EndIf
 EndFunc

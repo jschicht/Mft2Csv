@@ -1,5 +1,8 @@
 Mft2Csv changelog
 
+v2.0.0.28
+Added commandline support.
+
 v2.0.0.27
 Fixed incorrect decode of GUID's, relevant for $OBJECT_ID.
 
