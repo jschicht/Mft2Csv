@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.28
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.29
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -107,7 +107,7 @@ Global $myctredit, $CheckUnicode, $CheckCsvSplit, $checkFixups, $checkBrokenMFT,
 
 If $cmdline[0] > 0 Then
 	$CommandlineMode = 1
-	ConsoleWrite("Mft2Csv 2.0.0.28" & @CRLF)
+	ConsoleWrite("Mft2Csv 2.0.0.29" & @CRLF)
 	$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
 	$logfile = FileOpen(@ScriptDir & "\" & $TimestampStart & ".log",2+32)
 	_GetInputParams()
@@ -116,7 +116,7 @@ Else
 
 	Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode
 
-	$Form = GUICreate("MFT2CSV 2.0.0.28", 560, 450, -1, -1)
+	$Form = GUICreate("MFT2CSV 2.0.0.29", 560, 450, -1, -1)
 	GUISetOnEvent($GUI_EVENT_CLOSE, "_HandleExit", $Form)
 
 	$Combo = GUICtrlCreateCombo("", 20, 30, 390, 20)
@@ -589,6 +589,9 @@ Func _ExtractSystemfile()
 			EndIf
 		EndIf
 		$Signature = ""
+		If Not Mod($i,50000) Then
+			FileFlush($csv)
+		EndIf
 	Next
 	_WinAPI_CloseHandle($hDisk)
 	AdlibUnRegister()
@@ -2884,19 +2887,16 @@ EndFunc
 
 Func _GenDummyDataQ()
 	Global $DataQ[2]
-	Local $PartA, $PartB, $PartC, $PartD, $PartE, $PartF, $PartG, $PartH, $PartI, $PartJ, $PartK
+	Local $PartA, $PartB, $PartD, $PartF, $PartH, $PartI, $PartJ, $PartK
 	$PartA = "8000000048000000010040000000010000000000000000003F000000000000004000000000000000"
-	$partB = _SwapEndian(Hex($MftFileSize,8)) ; Allocated size
-	$partC = "00000000"
-	$partD = _SwapEndian(Hex($MftFileSize,8)) ; Real size
-	$partE = "00000000"
-	$partF = _SwapEndian(Hex($MftFileSize,8)) ; Initialized size
-	$partG = "00000000"
+	$partB = _SwapEndian(Hex($MftFileSize,16)) ; Allocated size
+	$partD = _SwapEndian(Hex($MftFileSize,16)) ; Real size
+	$partF = _SwapEndian(Hex($MftFileSize,16)) ; Initialized size
 	$partH = "14"
 	$partI = Hex(Int(((512+$MftFileSize-Mod($MftFileSize,512))/512/8)),8)
 	$partJ = "01"
 	$partK = "0000"
-	$DataQ[1] = $PartA & $PartB & $PartC & $PartD & $PartE & $PartF & $PartG & $PartH & $PartI & $PartJ & $PartK
+	$DataQ[1] = $PartA & $PartB & $PartD & $PartF & $PartH & $PartI & $PartJ & $PartK
 	$ClustersPerFileRecordSegment = Ceiling($MFT_Record_Size/$BytesPerCluster)
 	$BytesPerSector = 512
 EndFunc

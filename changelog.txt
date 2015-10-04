@@ -1,5 +1,9 @@
 Mft2Csv changelog
 
+v2.0.0.29
+Fixed bug that caused very large extracted MFT's with size beyond dword to only get parts of it parsed.
+Added powershell script to help splitting very large csv's into smaller ones.
+
 v2.0.0.28
 Added commandline support.
 
