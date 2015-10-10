@@ -1,5 +1,10 @@
 Mft2Csv changelog
 
+v2.0.0.30
+Added option to specify a second precision separator, to be used as separation between MilliSec and NanoSec.
+Added option to specify a custom error value for invalid timestamps, or incorrectly decoded timestamps.
+Added 2 sql's for database schema and import of data, along with instructions for how to import the csv into a MySql database.
+
 v2.0.0.29
 Fixed bug that caused very large extracted MFT's with size beyond dword to only get parts of it parsed.
 Added powershell script to help splitting very large csv's into smaller ones.

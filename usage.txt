@@ -10,6 +10,8 @@ Select if fixups should be skipped or not. Default to off. Usually only applicab
 Select if $MFT should be treated as broken. Default to off. Only applicable when using $MFT file as input. Should be used when fragments of $MFT is used and  $MFT is not in the first record.
 Select if resident data should be extracted. Default to off. Require to select the path to extract to.
 Select format of decoded timestamps, as well as the precision (None, MilliSec, NanoSec), and millisec/precision separator. Examples are displayed in GUI. Choose if extra timestamps are to be dumped to a seperate csv by ticking off "split csv".
+A second precision seperator can also be configured to split MilliSec and NanoSec. The default is empty, that is no separation.
+Select a custom error value for timestamps. The default one is compatible for import into MySql. 
 
 1. Parsing $MFT on the systemdrive from your running live system.
 Detected NTFS volumes will be displayed in the second combobox from the top. If new drive is attached or mounted, click "Rescan Mounted Drives". Select target volume in the second combo.
@@ -95,6 +97,10 @@ An integer from 1 - 6 for specifying the timestamp format. Start the gui to see 
 What precision to use in the timestamp. Valid values are None, MilliSec and NanoSec. Default is NanoSec.
 /TSPrecisionSeparator:
 The separator to put in the separation of the precision. Default is ".". Start the gui to see what it means.
+/TSPrecisionSeparator2:
+The separator to put in between MilliSec and NanoSec in the precision of timestamp. Default is empty/nothing. Start the gui to see what it means.
+/TSErrorVal:
+A custom error value to put with errors in timestamp decode. Default value is '0000-00-00 00:00:00', which is compatible with MySql, and represents and invalid timestamp value for NTFS.
 /SplitCsv:
 Boolean value for specifying if csv is to be split. Default is 0. Can be 0 or 1.
 /RecordSize:
@@ -149,4 +155,6 @@ Mft2Csv.exe /MftFile:c:\temp\$MFT /TimeZone:-10.00 /RecordSize:4096 /ExtractResi
 Mft2Csv.exe /Volume:e: /TimeZone:3.00 /RecordSize:4096 /TSFormat:1 /TSPrecision:MilliSec
 Mft2Csv.exe /Volume:e: /TSFormat:2 /TSPrecision:None
 Mft2Csv.exe /MftFile:c:\temp\$MFT /ExtractResident:1 /ExtractPath:c:\temp\ResidentData
+Mft2Csv /MftFile:C:\temp\$MFT /TSPrecision:NanoSec
 
+Last example is a basic that uses common defaults that work out just fine in most cases. Also compatible with MySql imports.
