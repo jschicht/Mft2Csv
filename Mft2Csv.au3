@@ -4,7 +4,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.31
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.32
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -108,7 +108,7 @@ Global $OverallProgress, $FileProgress, $CurrentProgress=-1, $ProgressStatus, $P
 Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Global $myctredit, $CheckUnicode, $CheckCsvSplit, $checkFixups, $checkBrokenMFT, $checkl2t, $checkbodyfile, $checkdefaultall, $SeparatorInput, $checkquotes
-$Progversion = "Mft2Csv 2.0.0.31"
+$Progversion = "Mft2Csv 2.0.0.32"
 If $cmdline[0] > 0 Then
 	$CommandlineMode = 1
 	ConsoleWrite($Progversion & @CRLF)
@@ -336,10 +336,18 @@ Func _ExtractSystemfile()
 
 	_SelectCsv()
 
+	If Not $CommandlineMode Then
+		$TimestampErrorVal = GUICtrlRead($TimestampErrorInput)
+	Else
+		$TimestampErrorVal = $TimestampErrorVal
+	EndIf
+
 	If $CommandlineMode Then
 		$PrecisionSeparator = $PrecisionSeparator
+		$PrecisionSeparator2 = $PrecisionSeparator2
 	Else
 		$PrecisionSeparator = GUICtrlRead($PrecisionSeparatorInput)
+		$PrecisionSeparator2 = GUICtrlRead($PrecisionSeparatorInput2)
 	EndIf
 	If StringLen($PrecisionSeparator) <> 1 Then
 		If Not $CommandlineMode Then _DisplayInfo("Error: Precision separator not set properly" & @crlf)

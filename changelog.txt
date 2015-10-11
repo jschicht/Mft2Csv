@@ -1,5 +1,8 @@
 Mft2Csv changelog
 
+v2.0.0.32
+Fixed minor bug that caused timestamp precision 2 and timestamp error val not to be re-read at each call to _Main.
+
 v2.0.0.31
 Changed file encoding to utf8 with BOM, when unicode configured. The previous ucs2 would not import into MySql.
 Added auto generated sql file with correct settings for import of csv.
