@@ -4,11 +4,12 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.30
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.31
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
 #Include <WinAPIEx.au3>
+#Include <File.au3>
 #include <String.au3>
 #include <Date.au3>
 #include <array.au3>
@@ -107,12 +108,12 @@ Global $OverallProgress, $FileProgress, $CurrentProgress=-1, $ProgressStatus, $P
 Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Global $myctredit, $CheckUnicode, $CheckCsvSplit, $checkFixups, $checkBrokenMFT, $checkl2t, $checkbodyfile, $checkdefaultall, $SeparatorInput, $checkquotes
-$Progversion = "Mft2Csv 2.0.0.30"
+$Progversion = "Mft2Csv 2.0.0.31"
 If $cmdline[0] > 0 Then
 	$CommandlineMode = 1
 	ConsoleWrite($Progversion & @CRLF)
 	$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
-	$logfile = FileOpen(@ScriptDir & "\" & $TimestampStart & ".log",2+32)
+	$logfile = FileOpen(@ScriptDir & "\MftDump_" & $TimestampStart & ".log",2+32)
 	_GetInputParams()
 Else
 	$CommandlineMode = 0
@@ -209,7 +210,7 @@ Else
 	$tDelta = $tDelta*-1 ;Since delta is substracted from timestamp later on
 
 	$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
-	$logfile = FileOpen(@ScriptDir & "\" & $TimestampStart & ".log",2+32)
+	$logfile = FileOpen(@ScriptDir & "\MftDump_" & $TimestampStart & ".log",2+32)
 	$subset = 0
 
 	Select
@@ -326,7 +327,7 @@ Func _ExtractSystemfile()
 		$CheckUnicode = GUICtrlRead($CheckUnicode)
 	EndIf
 	If $CheckUnicode = 1 Then
-		$EncodingWhenOpen = 2+32
+		$EncodingWhenOpen = 2+128
 		_DebugOut("UNICODE configured")
 	Else
 		$EncodingWhenOpen = 2
@@ -441,6 +442,13 @@ Func _ExtractSystemfile()
 		EndIf
 		If Not $CommandlineMode Then _DisplayInfo("Target volume is: " & $TargetDrive & @crlf)
 	EndIf
+
+	$MftSqlFile = @ScriptDir & "\MftDump_"&$TimestampStart&".sql"
+	FileInstall("C:\temp\import-csv-mft.sql", $MftSqlFile)
+	$FixedPath = StringReplace($csvfile,"\","\\")
+	Sleep(500)
+	_ReplaceStringInFile($MftSqlFile,"__PathToCsv__",$FixedPath)
+	If $CheckUnicode = 1 Then _ReplaceStringInFile($MftSqlFile,"latin1", "utf8")
 
 	If Not $IsMftFile Then _WinAPI_SetFilePointerEx($hDisk, $ImageOffset, $FILE_BEGIN)
 	$BootRecord = _GetDiskConstants()

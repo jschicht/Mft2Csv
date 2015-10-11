@@ -1,5 +1,9 @@
 Mft2Csv changelog
 
+v2.0.0.31
+Changed file encoding to utf8 with BOM, when unicode configured. The previous ucs2 would not import into MySql.
+Added auto generated sql file with correct settings for import of csv.
+
 v2.0.0.30
 Added option to specify a second precision separator, to be used as separation between MilliSec and NanoSec.
 Added option to specify a custom error value for invalid timestamps, or incorrectly decoded timestamps.
