@@ -1,5 +1,9 @@
 Mft2Csv changelog
 
+v2.0.0.33
+Suppressed background console when launching gui.
+Compiled binaries with latest version 3.3.14.2.
+
 v2.0.0.32
 Fixed minor bug that caused timestamp precision 2 and timestamp error val not to be re-read at each call to _Main.
 
