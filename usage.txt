@@ -85,6 +85,8 @@ The output format of csv. Valid values can be l2t, BodyFile, all.
 Boolean value for handling MFT's with bad format. Default is 0. Can be 0 or 1.
 /SkipFixups:
 Boolean value to skip fixups. Primarily used with memory dumps. Default is 0. Can be 0 or 1.
+/ScanSlack:
+Boolean value for scanning record slack space for older $I30 entries ($INDEX_ROOT). Default is 0. Can be 0 or 1.
 /Separator:
 The separator to use in the csv. Default is |
 /QuotationMark:
@@ -150,11 +152,11 @@ The available TimeZone's to use are:
 14.00
 
 Examples:
-Mft2Csv.exe /MftFile:c:\temp\$MFT /TimeZone:2.00 /RecordSize:4096 /ExtractResident:1 /TSFormat:1 /TSPrecision:MilliSec /Unicode:1
+Mft2Csv.exe /MftFile:c:\temp\$MFT /TimeZone:2.00 /RecordSize:4096 /ExtractResident:1 /TSFormat:1 /TSPrecision:MilliSec /Unicode:1 /ScanSlack:1
 Mft2Csv.exe /MftFile:c:\temp\$MFT /TimeZone:-10.00 /RecordSize:4096 /ExtractResident:1 /TSFormat:4 /TSPrecision:NanoSec /Unicode:1
 Mft2Csv.exe /Volume:e: /TimeZone:3.00 /RecordSize:4096 /TSFormat:1 /TSPrecision:MilliSec
 Mft2Csv.exe /Volume:e: /TSFormat:2 /TSPrecision:None
 Mft2Csv.exe /MftFile:c:\temp\$MFT /ExtractResident:1 /ExtractPath:c:\temp\ResidentData
-Mft2Csv /MftFile:C:\temp\$MFT /TSPrecision:NanoSec
+Mft2Csv /MftFile:C:\temp\$MFT /TSPrecision:NanoSec /ScanSlack:1
 
 Last example is a basic that uses common defaults that work out just fine in most cases. Also compatible with MySql imports.

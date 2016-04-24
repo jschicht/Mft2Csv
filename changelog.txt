@@ -1,5 +1,8 @@
 Mft2Csv changelog
 
+v2.0.0.34
+Added new feature for scanning record slack space for traces of old $I30 entries ($INDEX_ROOT).
+
 v2.0.0.33
 Suppressed background console when launching gui.
 Compiled binaries with latest version 3.3.14.2.
