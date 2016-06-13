@@ -1,5 +1,14 @@
 Mft2Csv changelog
 
+v2.0.0.35
+Added option to specify output directory for all output. Button text changed from "Set Extract Path" to "Set Output Path".
+Added information to debug.log when attributes $FILE_NAME and $DATA are not decoded (will only decode first 4 and 3 respectively).
+Changed name of main output csv from MftDump_ to Mft_
+Added slackspace decoder for Recycle bin's $I files.
+Fixed the output csv's of the slack decoder not being written when in commandline mode.
+Changed default table name from mft2csv to mft in the database schema.
+Slight name change of the output csv's from slack decoder.
+
 v2.0.0.34
 Added new feature for scanning record slack space for traces of old $I30 entries ($INDEX_ROOT).
 

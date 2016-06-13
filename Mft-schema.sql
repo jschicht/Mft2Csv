@@ -1,10 +1,5 @@
-CREATE DATABASE IF NOT EXISTS Ntfs
-	CHARACTER SET 'utf8'
-	COLLATE 'utf8_general_ci';
 
-USE Ntfs;
-
-CREATE TABLE IF NOT EXISTS mft2csv(
+CREATE TABLE IF NOT EXISTS mft(
    `RecordOffset`               VARCHAR(18) NOT NULL 
   ,`Signature`                  VARCHAR(4) NOT NULL
   ,`IntegrityCheck`             VARCHAR(3)

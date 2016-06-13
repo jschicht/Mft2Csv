@@ -5,7 +5,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.34
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.35
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -18,8 +18,8 @@
 ;
 ; by Joakim Schicht & Ddan
 ; parts by trancexxx, Ascend4nt & others
-Global $DummyPrependBytes = "00000000000000000000000000000000000000000000000000000000000000000000000000000000",$I30EntriesCsv
-Global $_COMMON_KERNEL32DLL=DllOpen("kernel32.dll"), $separator="|", $PrecisionSeparator=".", $PrecisionSeparator2="", $dol2t=False, $DoDefaultAll=False, $DoBodyfile=False, $SkipFixups=False, $MftIsBroken=False, $ExtractResident=False, $ExtractionPath, $DoSplitCsv=False, $csvextra, $style, $TimestampStart
+Global $DummyPrependBytes = "00000000000000000000000000000000000000000000000000000000000000000000000000000000",$I30EntriesCsv,$RBICsv
+Global $_COMMON_KERNEL32DLL=DllOpen("kernel32.dll"), $separator="|", $PrecisionSeparator=".", $PrecisionSeparator2="", $dol2t=False, $DoDefaultAll=False, $DoBodyfile=False, $SkipFixups=False, $MftIsBroken=False, $ExtractResident=False, $OutputPath=@ScriptDir, $DoSplitCsv=False, $csvextra, $style, $TimestampStart
 Global $csv, $csvfile, $RecordOffset, $RecordOffsetDec, $Signature, $ADS, $FN_NamePath, $UTCconfig, $de=",", $MftFileSize, $FN_FileName, $LogicalClusterNumberforthefileMFT, $ClustersPerFileRecordSegment, $MftAttrListString, $BytesPerSector, $SplitMftRecArr[1]
 Global $HDR_LSN, $HDR_SequenceNo, $HDR_Flags, $HDR_RecRealSize, $HDR_RecAllocSize, $HDR_BaseRecord, $HDR_NextAttribID, $HDR_MFTREcordNumber, $HDR_HardLinkCount, $HDR_BaseRecSeqNo
 Global $SI_CTime, $SI_ATime, $SI_MTime, $SI_RTime, $SI_FilePermission, $SI_USN, $Errors, $DT_AllocSize, $DT_RealSize, $DT_InitStreamSize, $RecordSlackSpace,$SI_Quota,$FN_EaSize,$FN_EaSize_2,$FN_EaSize_3
@@ -109,13 +109,22 @@ Global $OverallProgress, $FileProgress, $CurrentProgress=-1, $ProgressStatus, $P
 Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Global $myctredit, $CheckUnicode, $CheckCsvSplit, $checkFixups, $checkBrokenMFT, $checkBruteForceSlack, $checkl2t, $checkbodyfile, $checkdefaultall, $SeparatorInput, $checkquotes
-$Progversion = "Mft2Csv 2.0.0.34"
+$Progversion = "Mft2Csv 2.0.0.35"
 If $cmdline[0] > 0 Then
 	$CommandlineMode = 1
 	ConsoleWrite($Progversion & @CRLF)
 	$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
-	$logfile = FileOpen(@ScriptDir & "\MftDump_" & $TimestampStart & ".log",2+32)
 	_GetInputParams()
+
+	$logfile = FileOpen($OutputPath & "\Mft_" & $TimestampStart & ".log",2+32)
+
+	$I30EntriesCsvFile = $OutputPath & "\Mft-Slack-I30-Entries_" & $TimestampStart & ".csv"
+	$I30EntriesCsv = FileOpen($I30EntriesCsvFile, $EncodingWhenOpen)
+	_WriteCSVHeaderI30Entries()
+
+	$RBICsvFile = $OutputPath & "\Mft-Slack-RBI_" & $TimestampStart & ".csv"
+	$RBICsv = FileOpen($RBICsvFile, $EncodingWhenOpen)
+	_WriteCSVHeaderRBI()
 Else
 	DllCall("kernel32.dll", "bool", "FreeConsole")
 	$CommandlineMode = 0
@@ -145,8 +154,8 @@ Else
 	GUICtrlSetOnEvent($buttonMftFile, "_HandleEvent")
 	;$buttonOutput = GUICtrlCreateButton("Choose CSV", 440, 100, 100, 20)
 	;GUICtrlSetOnEvent($buttonOutput, "_HandleEvent")
-	$buttonExtractedOut = GUICtrlCreateButton("Set Extract Path", 440, 100, 100, 20)
-	GUICtrlSetOnEvent($buttonExtractedOut, "_HandleEvent")
+	$buttonOutput = GUICtrlCreateButton("Set Output Path", 440, 100, 100, 20)
+	GUICtrlSetOnEvent($buttonOutput, "_HandleEvent")
 	$buttonStart = GUICtrlCreateButton("Start Processing", 430, 125, 120, 40)
 	GUICtrlSetOnEvent($buttonStart, "_HandleEvent")
 	$Label1 = GUICtrlCreateLabel("Set decoded timestamps to specific region:",5,50,230,20)
@@ -213,12 +222,16 @@ Else
 	$tDelta = $tDelta*-1 ;Since delta is substracted from timestamp later on
 
 	$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
-	$logfile = FileOpen(@ScriptDir & "\MftDump_" & $TimestampStart & ".log",2+32)
+	$logfile = FileOpen($OutputPath & "\Mft_" & $TimestampStart & ".log",2+32)
 	$subset = 0
 
-	$I30EntriesCsvFile = @ScriptDir & "\I30_Entries_" & $TimestampStart & ".csv"
+	$I30EntriesCsvFile = $OutputPath & "\Mft-Slack-I30-Entries_" & $TimestampStart & ".csv"
 	$I30EntriesCsv = FileOpen($I30EntriesCsvFile, $EncodingWhenOpen)
 	_WriteCSVHeaderI30Entries()
+
+	$RBICsvFile = $OutputPath & "\Mft-Slack-RBI_" & $TimestampStart & ".csv"
+	$RBICsv = FileOpen($RBICsvFile, $EncodingWhenOpen)
+	_WriteCSVHeaderRBI()
 
 	Select
 		Case $IsImage
@@ -289,18 +302,18 @@ Func _HandleEvent()
 ;					_DisplayInfo("Error: Output CSV not set " & @CRLF)
 ;					Return
 ;				EndIf
+				If $OutputPath="" Then
+					_DisplayInfo("Error: No output path selected" & @CRLF)
+					Return
+				EndIf
+				_DebugOut("Dumping output to: " & $OutputPath)
 				If GUICtrlRead($checkExtractResident) = 1 Then
 					$ExtractResident = True
-					If $ExtractionPath="" Then
-						_DisplayInfo("Error: No path selected for extracted resident data" & @CRLF)
-						Return
-					EndIf
-					_DebugOut("Extracting resident data to: " & $ExtractionPath)
 				EndIf
 				$active = True
-			Case $buttonExtractedOut
-				_SetExtractionPath()
-;				If $ExtractionPath="" Then Return
+			Case $buttonOutput
+				_SetOutputPath()
+;				If $OutputPath="" Then Return
 			Case $buttonScanPhysicalDrives
 				_GetPhysicalDrives("PhysicalDrive")
 				$IsShadowCopy = False
@@ -348,6 +361,8 @@ Func _ExtractSystemfile()
 	Else
 		$TimestampErrorVal = $TimestampErrorVal
 	EndIf
+
+	_DebugOut("Timestamp Precision: " & $TimestampPrecision)
 
 	If $CommandlineMode Then
 		$PrecisionSeparator = $PrecisionSeparator
@@ -471,7 +486,7 @@ Func _ExtractSystemfile()
 		If Not $CommandlineMode Then _DisplayInfo("Target volume is: " & $TargetDrive & @crlf)
 	EndIf
 
-	$MftSqlFile = @ScriptDir & "\MftDump_"&$TimestampStart&".sql"
+	$MftSqlFile = $OutputPath & "\Mft_import_csv_"&$TimestampStart&".sql"
 	FileInstall("C:\temp\import-csv-mft.sql", $MftSqlFile)
 	$FixedPath = StringReplace($csvfile,"\","\\")
 	Sleep(500)
@@ -1491,8 +1506,12 @@ Func _ParserCodeOldVersion($MFTEntry)
 				$AttributeKnown = 1
 				$FN_ON = 1
 				$FN_Number += 1 ; Need to come up with something smarter than this
-				If $FN_Number > 4 Then ContinueCase
-				_Get_FileName($MFTEntry, $NextAttributeOffset, $AttributeSize, $FN_Number)
+				If $FN_Number > 4 Then
+;					_DebugOut("Warning: Ref " & $HDR_MFTREcordNumber & " had $FILE_NAME number " & $FN_Number & " not decoded","0x"&StringMid($MFTEntry,$NextAttributeOffset,$AttributeSize*2))
+					_DebugOut("Warning: Ref " & $HDR_MFTREcordNumber & " had $FILE_NAME number " & $FN_Number & " not decoded")
+				Else
+					_Get_FileName($MFTEntry, $NextAttributeOffset, $AttributeSize, $FN_Number)
+				EndIf
 
 			Case $AttributeType = $OBJECT_ID
 				$AttributeKnown = 1
@@ -1518,8 +1537,11 @@ Func _ParserCodeOldVersion($MFTEntry)
 				$AttributeKnown = 1
 				$DT_ON = 1
 				$DT_Number += 1
-				If $DT_Number > 3 Then ContinueCase
-				_Get_Data($MFTEntry, $NextAttributeOffset, $AttributeSize, $DT_Number)
+				If $DT_Number > 3 Then
+					_DebugOut("Warning: Ref " & $HDR_MFTREcordNumber & " had $DATA number " & $DT_Number & " not decoded","0x"&StringMid($MFTEntry,$NextAttributeOffset,$AttributeSize*2))
+				Else
+					_Get_Data($MFTEntry, $NextAttributeOffset, $AttributeSize, $DT_Number)
+				EndIf
 
 			Case $AttributeType = $INDEX_ROOT
 				$AttributeKnown = 1
@@ -1579,8 +1601,101 @@ Func _ParserCodeOldVersion($MFTEntry)
 EndFunc
 
 Func _Get_SlackSpace($MFTEntry, $SS_Offset)
-;	_Brute_I30($MFTEntry,$SS_Offset+8)
-	_Brute_I30(StringMid($MFTEntry,$SS_Offset+8),$SS_Offset+8)
+	$SlackBytes = StringMid($MFTEntry,$SS_Offset+8)
+	If StringLen($SlackBytes) = 0 Then Return
+	If _Brute_I30($SlackBytes,$SS_Offset+8) Then Return
+	;Check for old $I files from Recycle Bin
+	If _Brute_RBI($SlackBytes,$SS_Offset+8) Then Return
+	_DebugOut("Unknown Slack in MftRef " & $HDR_MFTREcordNumber & ":","0x" & $SlackBytes)
+EndFunc
+
+Func _WriteCSVHeaderRBI()
+	$RBI_Csv_Header = "Offset"&$de&"MftRecordNumber"&$de&"FileName"&$de&"FileSize"&$de&"Timestamp"&$de&"TextInformation"
+	FileWriteLine($RBICsv, $RBI_Csv_Header & @CRLF)
+EndFunc
+
+Func _Brute_RBI($InputData,$SkeewedOffset)
+	Local $SkipUnicodeNames=1,$TextInformation,$SuccessCounter=0,$SS_RecordOffset,$SS_NameLengthMin=4,$NameTest1,$NameTest2
+	Local $LocalOffset = 1, $Counter=0,$FileNameHealthy=0
+	;Local $DummyPrependBytes = "000000000000000000000000000000000000000000000000" ;24 bytes
+	Local $DummyPrependBytes = "00000000000000000000000000000000" ;16 bytes
+	Local $VolumeSize=1073741824 ;1GB
+	Local $VolumeSizeAdjustment=1048576 ;Accomodate for NTFS systemfiles etc; 1MB
+	$InputSize = StringLen($InputData)
+	If Not ($InputSize >= 528*2) Then Return $SuccessCounter
+	$RegExPattern = "[1-9a-fA-F]"
+	If Not StringRegExp($InputData,$RegExPattern) Then Return $SuccessCounter
+	;_DebugOut("_Brute_RBI():","0x"&$InputData)
+	;ConsoleWrite("_Brute_RBI():" & @CRLF)
+	;ConsoleWrite(_HexEncode("0x" & $InputData) & @CRLF)
+	;ConsoleWrite(_HexEncode($InputData) & @CRLF)
+	;Workoaround to catch partly overwritten entries
+	If ($InputSize < 528*2) Then
+		$InputData = $DummyPrependBytes & $InputData
+	EndIf
+	While 1
+		$Counter+=1
+		$FileNameHealthy=0
+		$SS_RecordOffset = "0x" & Hex(Int($RecordOffsetDec + (($SkeewedOffset+$LocalOffset-1)/2)))
+		$SS_Unknown1 = StringMid($InputData,$LocalOffset,16)
+		$SS_Unknown1 = Dec(_SwapEndian($SS_Unknown1),2)
+		$SS_FileSize = StringMid($InputData,$LocalOffset+16,16)
+		$SS_FileSize = Dec(_SwapEndian($SS_FileSize),2)
+
+		$SS_Timestamp = StringMid($InputData,$LocalOffset+32,16)
+		$SS_Timestamp = _SwapEndian($SS_Timestamp)
+		$SS_TimestampTest = Dec($SS_Timestamp,2)
+		$SS_Timestamp_tmp = _WinTime_UTCFileTimeToLocalFileTime("0x" & $SS_Timestamp)
+		$SS_Timestamp = _WinTime_UTCFileTimeFormat(Dec($SS_Timestamp,2) - $tDelta, $DateTimeFormat, $TimestampPrecision)
+		If @error Then
+			$SS_Timestamp = $TimestampErrorVal
+		ElseIf $TimestampPrecision = 2 Then
+			$SS_Timestamp_Core = StringMid($SS_Timestamp,1,StringLen($SS_Timestamp)-4)
+			$SS_Timestamp_Precision = StringRight($SS_Timestamp,3)
+		ElseIf $TimestampPrecision = 3 Then
+			$SS_Timestamp = $SS_Timestamp & $PrecisionSeparator2 & _FillZero(StringRight($SS_Timestamp_tmp, 4))
+			$SS_Timestamp_Core = StringMid($SS_Timestamp,1,StringLen($SS_Timestamp)-9)
+			$SS_Timestamp_Precision = StringRight($SS_Timestamp,8)
+		Else
+			$SS_Timestamp_Core = $SS_Timestamp
+		EndIf
+		;$SS_FileName = StringMid($InputData,$LocalOffset+48,16)
+		$SS_FileNameHex = StringMid($InputData,$LocalOffset+48,$SS_NameLengthMin*4)
+
+		$NameTest2 = _ValidateMinimumFileName($SS_FileNameHex)
+		If $NameTest2 Then
+			$FileNameHealthy = 1
+		Endif
+
+		If $NameTest2 Then
+			$SS_FileName = _ValidateCompleteName(StringMid($InputData,$LocalOffset+48))
+		Else
+;			ConsoleWrite("Error in filename: " & @CRLF)
+;			ConsoleWrite("$SS_Indx_FileNameHex: " & $SS_Indx_FileNameHex & @CRLF)
+;			ConsoleWrite("$SS_Indx_FileName: " & $SS_Indx_FileName & @CRLF)
+		EndIf
+		If $LocalOffset >= StringLen($InputData) Then ExitLoop
+
+		If $FileNameHealthy Then
+;		If $FileNameHealthy And $SS_Timestamp<>$TimestampErrorVal And $SS_FileSize < $VolumeSize-$VolumeSizeAdjustment Then
+			$SuccessCounter+=1
+			If ($SS_Unknown1 <> 1) Then $TextInformation &= ";Invalid Unknown1"
+			If Not ($SS_FileSize < $VolumeSize-$VolumeSizeAdjustment) Then $TextInformation &= ";Invalid FileSize"
+			If $SS_Timestamp=$TimestampErrorVal Then $TextInformation &= ";Invalid Timestamp"
+			If $SS_TimestampTest < 112589990684262400 Or $SS_TimestampTest > 139611588448485376 Then ;14 oktober 1957 - 31 mai 2043
+				$TextInformation &= ";Timestamp out of range"
+			EndIf
+			FileWriteLine($RBICsv, $SS_RecordOffset & $de & $HDR_MFTREcordNumber & $de & $SS_FileName & $de & $SS_FileSize & $de & $SS_Timestamp & $de & $TextInformation & @crlf)
+			ExitLoop
+		Else
+			$LocalOffset += 2
+			;Check if there's any point in parsing the remaining bytes
+			If Mod($Counter,16) = 0 Then
+				If Not StringRegExp(StringMid($InputData,$LocalOffset),$RegExPattern) Then Return $SuccessCounter
+			EndIf
+		EndIf
+	WEnd
+	Return $SuccessCounter
 EndFunc
 
 Func _WriteCSVHeaderI30Entries()
@@ -1589,10 +1704,10 @@ Func _WriteCSVHeaderI30Entries()
 EndFunc
 
 Func _Brute_I30($InputData,$SkeewedOffset)
-	Local $SkipUnicodeNames=1,$TextInformation,$SS_MFTReference,$SS_MFTReferenceSeqNo,$SS_MFTReferenceOfParent,$SS_MFTReferenceOfParentSeqNo
+	Local $SkipUnicodeNames=1,$TextInformation,$SS_MFTReference,$SS_MFTReferenceSeqNo,$SS_MFTReferenceOfParent,$SS_MFTReferenceOfParentSeqNo,$SuccessCounter=0,$SS_RecordOffset
 	Local $LocalOffset = 1, $Counter=0
 	$RegExPattern = "[1-9a-fA-F]"
-	If Not StringRegExp($InputData,$RegExPattern) Then Return
+	If Not StringRegExp($InputData,$RegExPattern) Then Return $SuccessCounter
 ;	ConsoleWrite("_Brute_I30():" & @CRLF)
 ;	ConsoleWrite(_HexEncode("0x" & $InputData) & @CRLF)
 	;Workoaround to catch partly overwritten entries
@@ -1735,6 +1850,7 @@ Func _Brute_I30($InputData,$SkeewedOffset)
 		EndIf
 ;		If $FileNameHealthy And $SS_Indx_NameLength > 0 And $SS_Indx_CTime<>$TimestampErrorVal And $SS_Indx_ATime<>$TimestampErrorVal And $SS_Indx_MTime<>$TimestampErrorVal And $SS_Indx_RTime<>$TimestampErrorVal And $SS_Indx_NameSpace <> "Unknown" And $SS_Indx_ReparseTag <> "UNKNOWN" And $SS_Indx_AllocSize >= $SS_Indx_RealSize And Mod($SS_Indx_AllocSize,8)=0 Then
 		If $FileNameHealthy And $SS_Indx_NameLength > 0 And $SS_Indx_MTime<>$TimestampErrorVal And $SS_Indx_RTime<>$TimestampErrorVal And $SS_Indx_NameSpace <> "Unknown" And $SS_Indx_ReparseTag <> "UNKNOWN" And $SS_Indx_AllocSize >= $SS_Indx_RealSize And Mod($SS_Indx_AllocSize,8)=0 Then
+			$SuccessCounter+=1
 			If ($SS_MFTReferenceSeqNo = 0) Or ($SS_MFTReference=0 And $SS_Indx_FileName <> "$MFT") Then $TextInformation &= ";Invalid MftRef and SeqNo"
 			If $SS_MFTReferenceOfParentSeqNo = 0 Then $TextInformation &= ";Invalid Parent MftRef and MftRefSeqNo"
 			If $SS_Indx_CTime=$TimestampErrorVal Then $TextInformation &= ";Invalid CTime"
@@ -1749,10 +1865,11 @@ Func _Brute_I30($InputData,$SkeewedOffset)
 			$LocalOffset += 2
 			;Check if there's any point in parsing the remaining bytes
 			If Mod($Counter,16) = 0 Then
-				If Not StringRegExp(StringMid($InputData,$LocalOffset),$RegExPattern) Then Return
+				If Not StringRegExp(StringMid($InputData,$LocalOffset),$RegExPattern) Then Return $SuccessCounter
 			EndIf
 		EndIf
 	WEnd
+	Return $SuccessCounter
 EndFunc
 
 Func _File_Attributes($FAInput)
@@ -1820,6 +1937,49 @@ Func _GetReparseType($ReparseType)
 		Case Else
 			Return 'UNKNOWN(' & $ReparseType & ')'
 	EndSelect
+EndFunc
+
+Func _ValidateCompleteName($InputString)
+	Local $CarvedFileName=""
+;	ConsoleWrite("$InputString: " & $InputString & @CRLF)
+	$StringLength = StringLen($InputString)
+	For $i = 1 To $StringLength Step 4
+		;Skip first 4 characters as they are already tested
+		If $i < 17 Then ContinueLoop
+		$TestChunkHex = StringMid($InputString,$i,4)
+;		ConsoleWrite("$TestChunkHex: " & $TestChunkHex & @CRLF)
+		$TestChunk = Dec(_SwapEndian($TestChunkHex),2)
+		If ($TestChunk >= 32 And $TestChunk < 127) And ($TestChunk <> 47 And $TestChunk <> 92 And $TestChunk <> 58 And $TestChunk <> 42 And $TestChunk <> 63 And $TestChunk <> 34 And $TestChunk <> 60 And $TestChunk <> 62) Then
+			ContinueLoop
+		Else
+			ExitLoop
+		EndIf
+	Next
+	$CarvedFileName = BinaryToString("0x"&StringMid($InputString,1,$i-1),2)
+;	ConsoleWrite("$CarvedFileName: " & $CarvedFileName & @CRLF)
+	Return $CarvedFileName
+EndFunc
+
+Func _ValidateMinimumFileName($InputString)
+;	ConsoleWrite("$InputString: " & $InputString & @CRLF)
+	;Test A-Z
+	$TestChunk = StringMid($InputString,1,4)
+	$TestChunk = Dec(_SwapEndian($TestChunk),2)
+	If Not ($TestChunk >= 65 And $TestChunk <= 90) Then Return 0
+	;Test :
+	$TestChunk = StringMid($InputString,5,4)
+	$TestChunk = Dec(_SwapEndian($TestChunk),2)
+	If Not ($TestChunk = 58) Then Return 0
+	;Test \
+	$TestChunk = StringMid($InputString,9,4)
+	$TestChunk = Dec(_SwapEndian($TestChunk),2)
+	If Not ($TestChunk = 92) Then Return 0
+	;Test first character in filename
+	$TestChunk = StringMid($InputString,13,4)
+	$TestChunk = Dec(_SwapEndian($TestChunk),2)
+	If Not ($TestChunk >= 32 And $TestChunk < 127) Then Return 0
+	If Not ($TestChunk <> 47 And $TestChunk <> 92 And $TestChunk <> 58 And $TestChunk <> 42 And $TestChunk <> 63 And $TestChunk <> 34 And $TestChunk <> 60 And $TestChunk <> 62) Then  Return 0
+	Return 1
 EndFunc
 
 Func _ValidateAnsiName($InputString)
@@ -2380,7 +2540,9 @@ Func _Get_ObjectID($MFTEntry,$OBJECTID_Offset,$OBJECTID_Size)
 			$GUID_BirthDomainID = StringMid($MFTEntry,$OBJECTID_Offset+144,32)
 			$GUID_BirthDomainID = _HexToGuidStr($GUID_BirthDomainID,1)
 		Case Else
-			ConsoleWrite("Error: The $OBJECT_ID size was unexpected." & @crlf)
+;			ConsoleWrite("Error: The $OBJECT_ID size was unexpected." & @crlf)
+;			_DebugOut("Error: The $OBJECT_ID size was unexpected.","0x" & StringMid($MFTEntry,$OBJECTID_Offset,$OBJECTID_Size*2))
+			_DebugOut("Error: The $OBJECT_ID size was unexpected.","0x" & StringMid($MFTEntry,$OBJECTID_Offset))
 	EndSelect
 EndFunc
 
@@ -2954,7 +3116,7 @@ EndFunc
 
 Func _WriteCSVExtraHeader()
 	Local $csv_extra_header
-	$csvextra = @ScriptDir&"\MftExtra_"&$TimestampStart&".csv"
+	$csvextra = $OutputPath&"\MftExtra_"&$TimestampStart&".csv"
 	$csv_extra_header = "HEADER_MFTREcordNumber"&$de&"SI_CTime_Core"&$de&"SI_CTime_Precision"&$de&"SI_ATime_Core"&$de&"SI_ATime_Precision"&$de&"SI_MTime_Core"&$de&"SI_MTime_Precision"&$de&"SI_RTime_Core"&$de&"SI_RTime_Precision"&$de
 	$csv_extra_header &= "FN_CTime_Core"&$de&"FN_CTime_Precision"&$de&"FN_ATime_Core"&$de&"FN_ATime_Precision"&$de&"FN_MTime_Core"&$de&"FN_MTime_Precision"&$de&"FN_RTime_Core"&$de&"FN_RTime_Precision"&$de
 	$csv_extra_header &= "FN_CTime_2_Core"&$de&"FN_CTime_2_Precision"&$de&"FN_ATime_2_Core"&$de&"FN_ATime_2_Precision"&$de&"FN_MTime_2_Core"&$de&"FN_MTime_2_Precision"&$de&"FN_RTime_2_Core"&$de&"FN_RTime_2_Precision"&$de
@@ -3252,9 +3414,9 @@ Func _ExtractResidentFile($Name, $Size, $record)
     $zflag = 0
 	Do
         DirCreate(StringMid($Name, 1, StringInStr($Name,"\",0,-1)))
-;		$hFile = _WinAPI_CreateFile("\\.\" & $ExtractionPath & "\" & $Name,3,6,7)
-		$hFile = _WinAPI_CreateFile("\\.\" & $ExtractionPath & "\[0x" & Hex($CurrentProgress*$MFT_Record_Size,8) & "]" & $Name,3,6,7)
-;		$hFile = _WinAPI_CreateFile("\\.\" & $ExtractionPath & "\" & $Name & "[0x" & Hex($CurrentProgress*1024,8) & "]",3,6,7)
+;		$hFile = _WinAPI_CreateFile("\\.\" & $OutputPath & "\" & $Name,3,6,7)
+		$hFile = _WinAPI_CreateFile("\\.\" & $OutputPath & "\[0x" & Hex($CurrentProgress*$MFT_Record_Size,8) & "]" & $Name,3,6,7)
+;		$hFile = _WinAPI_CreateFile("\\.\" & $OutputPath & "\" & $Name & "[0x" & Hex($CurrentProgress*1024,8) & "]",3,6,7)
         If $hFile Then
             _WinAPI_SetFilePointer($hFile, 0,$FILE_BEGIN)
             _WinAPI_WriteFile($hFile, DllStructGetPtr($xBuffer), $Size, $nBytes)
@@ -3281,8 +3443,8 @@ Func _ExtractResidentFile($Name, $Size, $record)
     Until $hFile
 EndFunc
 
-Func _SetExtractionPath()
-	$ExtractionPath = FileSelectFolder("Select path for extracted resident data.", "",7,@scriptdir)
+Func _SetOutputPath()
+	$OutputPath = FileSelectFolder("Select path for extracted output", "",7,@scriptdir)
 	If @error Then Return
 EndFunc
 
@@ -3370,7 +3532,7 @@ Func _TranslateTimestamp()
 EndFunc
 
 Func _SelectCsv()
-	$csvfile = @ScriptDir&"\MftDump_"&$TimestampStart&".csv"
+	$csvfile = $OutputPath&"\Mft_"&$TimestampStart&".csv"
 	$csv = FileOpen($csvfile, $EncodingWhenOpen)
 	If @error Then Return
 	_DisplayInfo("Output CSV file: " & $csvfile & @CRLF)
@@ -3416,7 +3578,7 @@ Func _GetInputParams()
 		;ConsoleWrite("Param " & $i & ": " & $cmdline[$i] & @CRLF)
 		If StringLeft($cmdline[$i],8) = "/Volume:" Then $TargetDrive = StringMid($cmdline[$i],9)
 		If StringLeft($cmdline[$i],9) = "/MftFile:" Then $TargetMftFile = StringMid($cmdline[$i],10)
-		If StringLeft($cmdline[$i],13) = "/ExtractPath:" Then $ExtractionPath = StringMid($cmdline[$i],14)
+		If StringLeft($cmdline[$i],12) = "/OutputPath:" Then $OutputPath = StringMid($cmdline[$i],13)
 		If StringLeft($cmdline[$i],17) = "/ExtractResident:" Then $ExtractResident = StringMid($cmdline[$i],19)
 		If StringLeft($cmdline[$i],10) = "/TimeZone:" Then $TimeZone = StringMid($cmdline[$i],11)
 		If StringLeft($cmdline[$i],14) = "/OutputFormat:" Then $OutputFormat = StringMid($cmdline[$i],15)
@@ -3543,9 +3705,10 @@ Func _GetInputParams()
 		$checkdefaultall = 1
 	EndIf
 
-	If $ExtractResident Then
-		If Not FileExists($ExtractionPath) Then
-			$ExtractionPath = @ScriptDir
+	If Not FileExists($OutputPath) Then
+		DirCreate($OutputPath)
+		If Not FileExists($OutputPath) Then
+			$OutputPath = @ScriptDir
 		EndIf
 	EndIf
 
@@ -3555,13 +3718,13 @@ Func _GetInputParams()
 	If StringLen($TimestampPrecision) > 0 Then
 		Select
 			Case $TimestampPrecision = "None"
-				_DebugOut("Timestamp Precision: " & $TimestampPrecision)
+;				_DebugOut("Timestamp Precision: " & $TimestampPrecision)
 				$TimestampPrecision = 1
 			Case $TimestampPrecision = "MilliSec"
-				_DebugOut("Timestamp Precision: " & $TimestampPrecision)
+;				_DebugOut("Timestamp Precision: " & $TimestampPrecision)
 				$TimestampPrecision = 2
 			Case $TimestampPrecision = "NanoSec"
-				_DebugOut("Timestamp Precision: " & $TimestampPrecision)
+;				_DebugOut("Timestamp Precision: " & $TimestampPrecision)
 				$TimestampPrecision = 3
 		EndSelect
 	Else

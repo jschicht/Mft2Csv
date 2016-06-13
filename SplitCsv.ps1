@@ -1,7 +1,7 @@
 #############
 # Powershell script to split very large csv files
 # Example command that split input csv into smaller csv's of 500000 lines in each, and preserving csv header:
-# SplitCsv.ps1 C:\temp\MftDump_2015-10-04_00-41-41.csv -d C:\temp\Output -l 500000
+# SplitCsv.ps1 C:\temp\Mft_2015-10-04_00-41-41.csv -d C:\temp\Output -l 500000
 #############
 [CmdletBinding(DefaultParameterSetName='Path')]
 param(

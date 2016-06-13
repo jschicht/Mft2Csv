@@ -75,8 +75,8 @@ Target volume in the form of c: (only Volume or MftFile should be used, not both
 Input MFT file extracted (only Volume or MftFile should be used, not both)
 /ExtractResident:
 Boolean value for extracting resident data. Default is 0. Can be 0 or 1.
-/ExtractPath:
-The extraction path if extracting resident data. Defaults to program directory.
+/OutputPath:
+The output path to write all output to. Defaults to program directory.
 /TimeZone:
 A string value for the timezone. See notes further down for valid values.
 /OutputFormat:
@@ -156,7 +156,7 @@ Mft2Csv.exe /MftFile:c:\temp\$MFT /TimeZone:2.00 /RecordSize:4096 /ExtractReside
 Mft2Csv.exe /MftFile:c:\temp\$MFT /TimeZone:-10.00 /RecordSize:4096 /ExtractResident:1 /TSFormat:4 /TSPrecision:NanoSec /Unicode:1
 Mft2Csv.exe /Volume:e: /TimeZone:3.00 /RecordSize:4096 /TSFormat:1 /TSPrecision:MilliSec
 Mft2Csv.exe /Volume:e: /TSFormat:2 /TSPrecision:None
-Mft2Csv.exe /MftFile:c:\temp\$MFT /ExtractResident:1 /ExtractPath:c:\temp\ResidentData
-Mft2Csv /MftFile:C:\temp\$MFT /TSPrecision:NanoSec /ScanSlack:1
+Mft2Csv.exe /MftFile:c:\temp\$MFT /ExtractResident:1 /OutputPath:c:\temp\MftOutput
+Mft2Csv.exe /MftFile:c:\temp\$MFT /TSPrecision:NanoSec /ScanSlack:1 /OutputPath:c:\temp\MftOutput
 
 Last example is a basic that uses common defaults that work out just fine in most cases. Also compatible with MySql imports.
