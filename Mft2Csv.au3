@@ -5,7 +5,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.35
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.36
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -109,7 +109,7 @@ Global $OverallProgress, $FileProgress, $CurrentProgress=-1, $ProgressStatus, $P
 Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Global $myctredit, $CheckUnicode, $CheckCsvSplit, $checkFixups, $checkBrokenMFT, $checkBruteForceSlack, $checkl2t, $checkbodyfile, $checkdefaultall, $SeparatorInput, $checkquotes
-$Progversion = "Mft2Csv 2.0.0.35"
+$Progversion = "Mft2Csv 2.0.0.36"
 If $cmdline[0] > 0 Then
 	$CommandlineMode = 1
 	ConsoleWrite($Progversion & @CRLF)
@@ -493,6 +493,13 @@ Func _ExtractSystemfile()
 	_ReplaceStringInFile($MftSqlFile,"__PathToCsv__",$FixedPath)
 	If $CheckUnicode = 1 Then _ReplaceStringInFile($MftSqlFile,"latin1", "utf8")
 
+	$MftCarvedI30SqlFile = $OutputPath & "\Mft-Slack-I30-Entries_"&$TimestampStart&".sql"
+	FileInstall("C:\temp\import-csv-mft-carved-i30.sql", $MftCarvedI30SqlFile)
+	$FixedPath = StringReplace($I30EntriesCsvFile,"\","\\")
+	Sleep(500)
+	_ReplaceStringInFile($MftCarvedI30SqlFile,"__PathToCsv__",$FixedPath)
+	If $CheckUnicode = 1 Then _ReplaceStringInFile($MftCarvedI30SqlFile,"latin1", "utf8")
+
 	If Not $IsMftFile Then _WinAPI_SetFilePointerEx($hDisk, $ImageOffset, $FILE_BEGIN)
 	$BootRecord = _GetDiskConstants()
 	If $BootRecord = "" Then
@@ -658,6 +665,15 @@ Func _ExtractSystemfile()
 	AdlibUnRegister()
 	GUIDelete($Progress)
 	If Not $CommandlineMode Then _DisplayInfo("Finished processing " & $Total & " records" & @crlf)
+
+	If (_FileCountLines($RBICsvFile) < 2) Then
+		FileMove($RBICsvFile,$RBICsvFile&".empty",1)
+		_DebugOut("Empty output: " & $RBICsvFile & " is postfixed with .empty")
+	EndIf
+	If (_FileCountLines($I30EntriesCsvFile) < 2) Then
+		FileMove($I30EntriesCsvFile,$I30EntriesCsvFile&".empty",1)
+		_DebugOut("Empty output: " & $I30EntriesCsvFile & " is postfixed with .empty")
+	EndIf
 	_DebugOut("Finished processing " & $Total & " records.")
 EndFunc
 

@@ -1,5 +1,9 @@
 Mft2Csv changelog
 
+v2.0.0.36
+Added automatic postfix of .empty extension on empty csv's.
+Added MySql schema and import sql for Mft-Slack-I30-Entries_<timestamp>.csv to MFT_Carved_I30 table.
+
 v2.0.0.35
 Added option to specify output directory for all output. Button text changed from "Set Extract Path" to "Set Output Path".
 Added information to debug.log when attributes $FILE_NAME and $DATA are not decoded (will only decode first 4 and 3 respectively).
