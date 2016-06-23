@@ -2,7 +2,7 @@
 CREATE TABLE IF NOT EXISTS mft(
 	`Id`						INT(11) NOT NULL AUTO_INCREMENT
 	,`RecordOffset`               VARCHAR(18) NOT NULL 
-	,`Signature`                  VARCHAR(4) NOT NULL
+	,`Signature`                  VARCHAR(7) NOT NULL
 	,`IntegrityCheck`             VARCHAR(3)
 	,`Style`                      VARCHAR(8)
 	,`HEADER_MFTREcordNumber`     INTEGER
