@@ -1,5 +1,10 @@
 Mft2Csv changelog
 
+v2.0.0.37
+Added separate csv for $ObjectId attribute decodes.
+Added break down of GUID/UUID as found in $ObjectId attribute and $O index of $ObjId, according to RFC 4122 (https://www.ietf.org/rfc/rfc4122.txt). That among other things includes timestamp.
+Added MySql schema and import sql for Mft-ObjectId-Entries_<timestamp>.csv to MFT_OBJECTID table.
+
 v2.0.0.36
 Added automatic postfix of .empty extension on empty csv's.
 Added MySql schema and import sql for Mft-Slack-I30-Entries_<timestamp>.csv to MFT_Carved_I30 table.
