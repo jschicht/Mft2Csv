@@ -1,5 +1,8 @@
 Mft2Csv changelog
 
+v2.0.0.39
+Moved the import sql files into the new import-sql sub directory so that compilation works with the project as is.
+
 v2.0.0.38
 Fixed bug that caused detection of symbolic links to shadow copies to fail under certain situations.
 

@@ -5,7 +5,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.38
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.39
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -110,7 +110,7 @@ Global $OverallProgress, $FileProgress, $CurrentProgress=-1, $ProgressStatus, $P
 Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Global $myctredit, $CheckUnicode, $CheckCsvSplit, $checkFixups, $checkBrokenMFT, $checkBruteForceSlack, $checkl2t, $checkbodyfile, $checkdefaultall, $SeparatorInput, $checkquotes
-$Progversion = "Mft2Csv 2.0.0.38"
+$Progversion = "Mft2Csv 2.0.0.39"
 If $cmdline[0] > 0 Then
 	$CommandlineMode = 1
 	ConsoleWrite($Progversion & @CRLF)
@@ -538,22 +538,22 @@ Func _ExtractSystemfile()
 		If Not $CommandlineMode Then _DisplayInfo("Target volume is: " & $TargetDrive & @crlf)
 	EndIf
 
-	$MftSqlFile = $OutputPath & "\Mft_import_csv_"&$TimestampStart&".sql"
-	FileInstall("C:\temp\import-csv-mft.sql", $MftSqlFile)
+	$MftSqlFile = $OutputPath & "\Mft_"&$TimestampStart&".sql"
+	FileInstall(".\import-sql\import-csv-mft.sql", $MftSqlFile)
 	$FixedPath = StringReplace($csvfile,"\","\\")
 	Sleep(500)
 	_ReplaceStringInFile($MftSqlFile,"__PathToCsv__",$FixedPath)
 	If $CheckUnicode = 1 Then _ReplaceStringInFile($MftSqlFile,"latin1", "utf8")
 
 	$MftCarvedI30SqlFile = $OutputPath & "\Mft-Slack-I30-Entries_"&$TimestampStart&".sql"
-	FileInstall("C:\temp\import-csv-mft-carved-i30.sql", $MftCarvedI30SqlFile)
+	FileInstall(".\import-sql\import-csv-mft-carved-i30.sql", $MftCarvedI30SqlFile)
 	$FixedPath = StringReplace($I30EntriesCsvFile,"\","\\")
 	Sleep(500)
 	_ReplaceStringInFile($MftCarvedI30SqlFile,"__PathToCsv__",$FixedPath)
 	If $CheckUnicode = 1 Then _ReplaceStringInFile($MftCarvedI30SqlFile,"latin1", "utf8")
 
 	$MftObjectIdSqlFile = $OutputPath & "\Mft-ObjectId-Entries_"&$TimestampStart&".sql"
-	FileInstall("C:\temp\import-csv-mft-objectid.sql", $MftObjectIdSqlFile)
+	FileInstall(".\import-sql\import-csv-mft-objectid.sql", $MftObjectIdSqlFile)
 	$FixedPath = StringReplace($EntriesObjectIdCsvFile,"\","\\")
 	Sleep(500)
 	_ReplaceStringInFile($MftObjectIdSqlFile,"__PathToCsv__",$FixedPath)
