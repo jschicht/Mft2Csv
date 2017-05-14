@@ -1,10 +1,11 @@
 #RequireAdmin
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=C:\Program Files (x86)\AutoIt3\Icons\au3.ico
+#AutoIt3Wrapper_UseUpx=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.37
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.38
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -109,7 +110,7 @@ Global $OverallProgress, $FileProgress, $CurrentProgress=-1, $ProgressStatus, $P
 Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Global $myctredit, $CheckUnicode, $CheckCsvSplit, $checkFixups, $checkBrokenMFT, $checkBruteForceSlack, $checkl2t, $checkbodyfile, $checkdefaultall, $SeparatorInput, $checkquotes
-$Progversion = "Mft2Csv 2.0.0.37"
+$Progversion = "Mft2Csv 2.0.0.38"
 If $cmdline[0] > 0 Then
 	$CommandlineMode = 1
 	ConsoleWrite($Progversion & @CRLF)
@@ -3604,18 +3605,17 @@ Func _SetOutputPath()
 EndFunc
 
 Func _GetPhysicalDrives($InputDevice)
-	Local $PhysicalDriveString, $hFile0
-	If StringLeft($InputDevice,10) = "GLOBALROOT" Then ; Shadow copies starts at 1 whereas physical drive starts at 0
-		$i=1
-	Else
-		$i=0
-	EndIf
+	Local $PhysicalDriveString, $hFile0, $i=0
 	GUICtrlSetData($Combo,"","")
 	$Entries = ''
 	GUICtrlSetData($ComboPhysicalDrives,"","")
 	$sDrivePath = '\\.\'&$InputDevice
-;	ConsoleWrite("$sDrivePath: " & $sDrivePath & @CRLF)
-	Do
+	If StringInStr($sDrivePath, "ShadowCopy") Then
+		$sDrivePath = StringReplace($sDrivePath,"\.\","\?\")
+	EndIf
+	;ConsoleWrite("$sDrivePath: " & $sDrivePath & @CRLF)
+	While 1
+		If $i > 200 Then ExitLoop
 		$hFile0 = _WinAPI_CreateFile($sDrivePath & $i,2,2,2)
 		If $hFile0 <> 0 Then
 			ConsoleWrite("Found: " & $sDrivePath & $i & @CRLF)
@@ -3623,7 +3623,7 @@ Func _GetPhysicalDrives($InputDevice)
 			$PhysicalDriveString &= $sDrivePath&$i&"|"
 		EndIf
 		$i+=1
-	Until $hFile0=0
+	WEnd
 	GUICtrlSetData($ComboPhysicalDrives, $PhysicalDriveString, StringMid($PhysicalDriveString, 1, StringInStr($PhysicalDriveString, "|") -1))
 EndFunc
 

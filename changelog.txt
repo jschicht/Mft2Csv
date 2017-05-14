@@ -1,5 +1,8 @@
 Mft2Csv changelog
 
+v2.0.0.38
+Fixed bug that caused detection of symbolic links to shadow copies to fail under certain situations.
+
 v2.0.0.37
 Added separate csv for $ObjectId attribute decodes.
 Added break down of GUID/UUID as found in $ObjectId attribute and $O index of $ObjId, according to RFC 4122 (https://www.ietf.org/rfc/rfc4122.txt). That among other things includes timestamp.
