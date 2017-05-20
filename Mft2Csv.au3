@@ -5,7 +5,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.39
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.40
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -18,7 +18,7 @@
 ;
 ; by Joakim Schicht & Ddan
 ; parts by trancexxx, Ascend4nt & others
-Global $DummyPrependBytes = "00000000000000000000000000000000000000000000000000000000000000000000000000000000",$I30EntriesCsv,$RBICsv,$EntriesObjectIdCsvFile, $EntriesObjectIdCsv
+Global $DummyPrependBytes = "00000000000000000000000000000000000000000000000000000000000000000000000000000000",$I30EntriesCsv,$RBICsv,$EntriesObjectIdCsvFile, $EntriesObjectIdCsv, $ReparsePointCsvFile, $ReparsePointCsv, $EaCsv, $EaCsvFile
 Global $_COMMON_KERNEL32DLL=DllOpen("kernel32.dll"), $separator="|", $PrecisionSeparator=".", $PrecisionSeparator2="", $dol2t=False, $DoDefaultAll=False, $DoBodyfile=False, $SkipFixups=False, $MftIsBroken=False, $ExtractResident=False, $OutputPath=@ScriptDir, $DoSplitCsv=False, $csvextra, $style, $TimestampStart
 Global $csv, $csvfile, $RecordOffset, $RecordOffsetDec, $Signature, $ADS, $FN_NamePath, $UTCconfig, $de="|", $MftFileSize, $FN_FileName, $LogicalClusterNumberforthefileMFT, $ClustersPerFileRecordSegment, $MftAttrListString, $BytesPerSector, $SplitMftRecArr[1]
 Global $HDR_LSN, $HDR_SequenceNo, $HDR_Flags, $HDR_RecRealSize, $HDR_RecAllocSize, $HDR_BaseRecord, $HDR_NextAttribID, $HDR_MFTREcordNumber, $HDR_HardLinkCount, $HDR_BaseRecSeqNo
@@ -110,7 +110,7 @@ Global $OverallProgress, $FileProgress, $CurrentProgress=-1, $ProgressStatus, $P
 Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Global $myctredit, $CheckUnicode, $CheckCsvSplit, $checkFixups, $checkBrokenMFT, $checkBruteForceSlack, $checkl2t, $checkbodyfile, $checkdefaultall, $SeparatorInput, $checkquotes
-$Progversion = "Mft2Csv 2.0.0.39"
+$Progversion = "Mft2Csv 2.0.0.40"
 If $cmdline[0] > 0 Then
 	$CommandlineMode = 1
 	ConsoleWrite($Progversion & @CRLF)
@@ -142,7 +142,7 @@ If $cmdline[0] > 0 Then
 	EndIf
 	_WriteCSVHeaderRBI()
 
-	;$ObjId:$O
+	;$OBJECT_ID
 	$EntriesObjectIdCsvFile = $OutputPath & "\Mft-ObjectId-Entries_" & $TimestampStart & ".csv"
 	$EntriesObjectIdCsv = FileOpen($EntriesObjectIdCsvFile, $EncodingWhenOpen)
 	If @error Then
@@ -151,6 +151,26 @@ If $cmdline[0] > 0 Then
 		Exit(1)
 	EndIf
 	_WriteObjectIdCsvHeader()
+
+	;$REPARSE_POINT
+	$ReparsePointCsvFile = $OutputPath & "\Mft-ReparsePoint-Entries_" & $TimestampStart & ".csv"
+	$ReparsePointCsv = FileOpen($ReparsePointCsvFile, $EncodingWhenOpen)
+	If @error Then
+		ConsoleWrite("Error opening: " & $ReparsePointCsvFile & @CRLF)
+		MsgBox(0, "Error", "Error opening: " & $ReparsePointCsvFile)
+		Exit(1)
+	EndIf
+	_WriteReparsePointCsvHeader()
+
+	;$EA
+	$EaCsvFile = $OutputPath & "\Mft-Ea-Entries_" & $TimestampStart & ".csv"
+	$EaCsv = FileOpen($EaCsvFile, $EncodingWhenOpen)
+	If @error Then
+		ConsoleWrite("Error opening: " & $EaCsvFile & @CRLF)
+		MsgBox(0, "Error", "Error opening: " & $EaCsvFile)
+		Exit(1)
+	EndIf
+	_WriteEaCsvHeader()
 
 Else
 	DllCall("kernel32.dll", "bool", "FreeConsole")
@@ -275,7 +295,7 @@ Else
 	EndIf
 	_WriteCSVHeaderRBI()
 
-	;$ObjectId
+	;$OBJECT_ID
 	$EntriesObjectIdCsvFile = $OutputPath & "\Mft-ObjectId-Entries_" & $TimestampStart & ".csv"
 	$EntriesObjectIdCsv = FileOpen($EntriesObjectIdCsvFile, $EncodingWhenOpen)
 	If @error Then
@@ -284,6 +304,26 @@ Else
 		Exit(1)
 	EndIf
 	_WriteObjectIdCsvHeader()
+
+	;$REPARSE_POINT
+	$ReparsePointCsvFile = $OutputPath & "\Mft-ReparsePoint-Entries_" & $TimestampStart & ".csv"
+	$ReparsePointCsv = FileOpen($ReparsePointCsvFile, $EncodingWhenOpen)
+	If @error Then
+		ConsoleWrite("Error opening: " & $ReparsePointCsvFile & @CRLF)
+		MsgBox(0, "Error", "Error opening: " & $ReparsePointCsvFile)
+		Exit(1)
+	EndIf
+	_WriteReparsePointCsvHeader()
+
+	;$EA
+	$EaCsvFile = $OutputPath & "\Mft-Ea-Entries_" & $TimestampStart & ".csv"
+	$EaCsv = FileOpen($EaCsvFile, $EncodingWhenOpen)
+	If @error Then
+		ConsoleWrite("Error opening: " & $EaCsvFile & @CRLF)
+		MsgBox(0, "Error", "Error opening: " & $EaCsvFile)
+		Exit(1)
+	EndIf
+	_WriteEaCsvHeader()
 
 	Select
 		Case $IsImage
@@ -737,6 +777,14 @@ Func _ExtractSystemfile()
 		FileMove($EntriesObjectIdCsvFile,$EntriesObjectIdCsvFile&".empty",1)
 		_DebugOut("Empty output: " & $EntriesObjectIdCsvFile & " is postfixed with .empty")
 	EndIf
+	If (_FileCountLines($ReparsePointCsvFile) < 2) Then
+		FileMove($ReparsePointCsvFile,$ReparsePointCsvFile&".empty",1)
+		_DebugOut("Empty output: " & $ReparsePointCsvFile & " is postfixed with .empty")
+	EndIf
+	If (_FileCountLines($EaCsvFile) < 2) Then
+		FileMove($EaCsvFile,$EaCsvFile&".empty",1)
+		_DebugOut("Empty output: " & $EaCsvFile & " is postfixed with .empty")
+	EndIf
 	_DebugOut("Finished processing " & $Total & " records.")
 EndFunc
 
@@ -838,6 +886,7 @@ Func _DoFileTree()
 						$FileTree[$FileRef] &= "**" & $ParentRef & "*" & $FileName
 					EndIf
 				ElseIf $Type = Dec("C0000000",2) Then
+					#cs
 					$tag = StringMid($record,$Offset + 48,8)
 					$PrintNameOffset = Dec(_SwapEndian(StringMid($record,$Offset+72,4)),2)
 					$PrintNameLength = Dec(_SwapEndian(StringMid($record,$Offset+76,4)),2)
@@ -849,6 +898,7 @@ Func _DoFileTree()
 						_DebugOut($ref & " Unhandled Reparse Tag: " & $tag, $record)
 					EndIf
 					$Reparse &= $ref & "*" & $tag & "*" & $PrintName & "?"
+					#ce
 				EndIf
 				$Offset += $Size*2
 			WEnd
@@ -1640,7 +1690,7 @@ Func _ParserCodeOldVersion($MFTEntry)
 			Case $AttributeType = $REPARSE_POINT
 				$AttributeKnown = 1
 				$RP_ON = 1
-				;			_Get_ReparsePoint()
+				_Get_ReparsePoint($MFTEntry, $NextAttributeOffset, $AttributeSize)
 
 			Case $AttributeType = $EA_INFORMATION
 				$AttributeKnown = 1
@@ -1650,7 +1700,7 @@ Func _ParserCodeOldVersion($MFTEntry)
 			Case $AttributeType = $EA
 				$AttributeKnown = 1
 				$EA_ON = 1
-				;			_Get_Ea()
+				_Get_Ea($MFTEntry, $NextAttributeOffset, $AttributeSize)
 
 			Case $AttributeType = $PROPERTY_SET
 				$AttributeKnown = 1
@@ -1978,11 +2028,15 @@ Func _File_Attributes($FAInput)
 EndFunc
 
 Func _GetReparseType($ReparseType)
-	;http://msdn.microsoft.com/en-us/library/dd541667(v=prot.10).aspx
-	;http://msdn.microsoft.com/en-us/library/windows/desktop/aa365740(v=vs.85).aspx
+	;winnt.h
+	;ntifs.h
 	Select
 		Case $ReparseType = '0x00000000'
-			Return 'ZERO'
+			Return 'RESERVED_ZERO'
+		Case $ReparseType = '0x00000001'
+			Return 'RESERVED_ONE'
+		Case $ReparseType = '0x00000002'
+			Return 'RESERVED_TWO'
 		Case $ReparseType = '0x80000005'
 			Return 'DRIVER_EXTENDER'
 		Case $ReparseType = '0x80000006'
@@ -2003,16 +2057,50 @@ Func _GetReparseType($ReparseType)
 			Return 'DEDUP'
 		Case $ReparseType = '0x80000014'
 			Return 'NFS'
-		Case $ReparseType = '0xA0000003'
-			Return 'MOUNT_POINT'
-		Case $ReparseType = '0xA000000C'
-			Return 'SYMLINK'
-		Case $ReparseType = '0xC0000004'
-			Return 'HSM'
 		Case $ReparseType = '0x80000015'
 			Return 'FILE_PLACEHOLDER'
 		Case $ReparseType = '0x80000017'
 			Return 'WOF'
+		Case $ReparseType = '0x80000018'
+			Return 'WCI'
+		Case $ReparseType = '0x80000019'
+			Return 'GLOBAL_REPARSE'
+		Case $ReparseType = '0x8000001B'
+			Return 'APPEXECLINK'
+		Case $ReparseType = '0x8000001E'
+			Return 'HFS'
+		Case $ReparseType = '0x80000020'
+			Return 'UNHANDLED'
+		Case $ReparseType = '0x80000021'
+			Return 'ONEDRIVE'
+		Case $ReparseType = '0x9000001A'
+			Return 'CLOUD'
+		Case $ReparseType = '0x9000101A'
+			Return 'CLOUD_ROOT'
+		Case $ReparseType = '0x9000201A'
+			Return 'CLOUD_ON_DEMAND'
+		Case $ReparseType = '0x9000301A'
+			Return 'CLOUD_ROOT_ON_DEMAND'
+		Case $ReparseType = '0x9000001C'
+			Return 'GVFS'
+		Case $ReparseType = '0xA0000003'
+			Return 'MOUNT_POINT'
+		Case $ReparseType = '0xA000000C'
+			Return 'SYMLINK'
+		Case $ReparseType = '0xA0000010'
+			Return 'IIS_CACHE'
+		Case $ReparseType = '0xA0000019'
+			Return 'GLOBAL_REPARSE'
+		Case $ReparseType = '0xA000001D'
+			Return 'LX_SYMLINK'
+		Case $ReparseType = '0xA000001F'
+			Return 'WCI_TOMBSTONE'
+		Case $ReparseType = '0xA0000022'
+			Return 'GVFS_TOMBSTONE'
+		Case $ReparseType = '0xC0000004'
+			Return 'HSM'
+		Case $ReparseType = '0xC0000014'
+			Return 'APPXSTRM'
 		Case Else
 			Return 'UNKNOWN(' & $ReparseType & ')'
 	EndSelect
@@ -2864,20 +2952,10 @@ Func _Get_Bitmap()
 	Return
 EndFunc   ;==>_Get_Bitmap
 
-Func _Get_ReparsePoint()
-;	ConsoleWrite("Get_ReparsePoint Function not implemented yet." & @CRLF)
-	Return
-EndFunc   ;==>_Get_ReparsePoint
-
 Func _Get_EaInformation()
 ;	ConsoleWrite("Get_EaInformation Function not implemented yet." & @CRLF)
 	Return
 EndFunc   ;==>_Get_EaInformation
-
-Func _Get_Ea()
-;	ConsoleWrite("Get_Ea Function not implemented yet." & @CRLF)
-	Return
-EndFunc   ;==>_Get_Ea
 
 Func _Get_PropertySet()
 ;	ConsoleWrite("Get_PropertySet Function not implemented yet." & @CRLF)
@@ -3917,3 +3995,147 @@ Func _DecodeTimestampFromGuid($StampDecode)
 	EndIf
 	Return $StampDecode
 EndFunc
+
+Func _WriteReparsePointCsvHeader()
+	$ReparsePoint_Csv_Header = "MftRef"&$de&"MftRefSeqNo"&$de&"ReparseType"&$de&"ReparseGuid"&$de&"ReparseData"&$de&"ReparseSubstititeName"&$de&"ReparsePrintName"
+	FileWriteLine($ReparsePointCsvFile, $ReparsePoint_Csv_Header & @CRLF)
+EndFunc
+
+Func _Get_ReparsePoint($Entry,$LocalAttributeOffset,$LocalAttributeSize)
+	Local $GuidPresent=0,$ReparseType,$ReparseData,$ReparseDataLength,$ReparsePadding,$ReparseGuid,$ReparseSubstituteNameOffset,$ReparseSubstituteNameLength,$ReparsePrintNameOffset,$ReparsePrintNameLength,$ReparseSubstituteName,$ReparsePrintName
+
+	$Entry = StringMid($Entry,$LocalAttributeOffset+48,($LocalAttributeSize*2)-48)
+	;ConsoleWrite("_Get_ReparsePoint(): " & @crlf)
+	;ConsoleWrite(_HexEncode("0x"&$Entry) & @crlf)
+	$LocalAttributeOffset = 1
+	$ReparseType = StringMid($Entry,$LocalAttributeOffset,8)
+	$ReparseType = _SwapEndian($ReparseType)
+	If Dec(StringMid($ReparseType,1,2)) < 128 Then ;Non-Microsoft - GUID exist
+		$GuidPresent = 1
+	EndIf
+	$ReparseType = "0x" & $ReparseType
+	$ReparseType = _GetReparseType($ReparseType)
+	$ReparseDataLength = StringMid($Entry,$LocalAttributeOffset+8,4)
+	$ReparseDataLength = Dec(_SwapEndian($ReparseDataLength),2)
+	$ReparsePadding = StringMid($Entry,$LocalAttributeOffset+12,4)
+	If $ReparseType = "WCI" Then
+		$ReparseGuid = StringMid($Entry,$LocalAttributeOffset+32,32)
+		$ReparseGuid = _HexToGuidStr($ReparseGuid,1)
+		$ReparsePrintNameLength = StringMid($Entry,$LocalAttributeOffset+64,4)
+		$ReparsePrintNameLength = Dec(_SwapEndian($ReparsePrintNameLength))
+		If $ReparsePrintNameLength > 0 Then
+			$ReparsePrintName = StringMid($Entry,($LocalAttributeOffset+68),$ReparsePrintNameLength*2)
+			$ReparsePrintName = BinaryToString("0x"&$ReparsePrintName,2)
+		EndIf
+	Else
+		If $GuidPresent Then
+			$ReparseGuid = StringMid($Entry,$LocalAttributeOffset+16,32)
+			$ReparseGuid = _HexToGuidStr($ReparseGuid,1)
+			$ReparseData = StringMid($Entry,$LocalAttributeOffset+48,$ReparseDataLength*2)
+		Else
+			$ReparseData = StringMid($Entry,$LocalAttributeOffset+16,$ReparseDataLength*2)
+		EndIf
+
+		$ReparseSubstituteNameOffset = StringMid($ReparseData,1,4)
+		$ReparseSubstituteNameOffset = Dec(_SwapEndian($ReparseSubstituteNameOffset),2)
+		$ReparseSubstituteNameLength = StringMid($ReparseData,5,4)
+		$ReparseSubstituteNameLength = Dec(_SwapEndian($ReparseSubstituteNameLength),2)
+		$ReparsePrintNameOffset = StringMid($ReparseData,9,4)
+		$ReparsePrintNameOffset = Dec(_SwapEndian($ReparsePrintNameOffset),2)
+		If $ReparseType = "SYMLINK" Then
+			;??
+			$ReparsePrintNameOffset += 4
+		EndIf
+		$ReparsePrintNameLength = StringMid($ReparseData,13,4)
+		$ReparsePrintNameLength = Dec(_SwapEndian($ReparsePrintNameLength),2)
+		;-----if $ReparseSubstituteNameOffset<>0 then the order is reversed and parsed from end of $ReparseData ????????
+		If StringMid($ReparseData,1,4) <> "0000" Then
+			$ReparseSubstituteName = StringMid($Entry,StringLen($Entry)+1-($ReparseSubstituteNameLength*2),$ReparseSubstituteNameLength*2)
+;-			ConsoleWrite("$ReparseSubstituteName: " & @crlf)
+;-			ConsoleWrite(_HexEncode("0x"&$ReparseSubstituteName) & @crlf)
+			$ReparseSubstituteName = BinaryToString("0x"&$ReparseSubstituteName,2)
+			$ReparsePrintName = StringMid($Entry,StringLen($Entry)+1-($ReparseSubstituteNameLength*2)-($ReparsePrintNameLength*2),$ReparsePrintNameLength*2)
+;-			ConsoleWrite("$ReparsePrintName: " & @crlf)
+;-			ConsoleWrite(_HexEncode("0x"&$ReparsePrintName) & @crlf)
+			$ReparsePrintName = BinaryToString("0x"&$ReparsePrintName,2)
+		Else
+;-			ConsoleWrite("2: " & @crlf)
+			If $ReparseType = "SYMLINK" Then
+				$ReparseSubstituteName = StringMid($Entry,$LocalAttributeOffset+16+24,$ReparseSubstituteNameLength*2)
+			Else
+				$ReparseSubstituteName = StringMid($Entry,$LocalAttributeOffset+16+16,$ReparseSubstituteNameLength*2)
+			EndIf
+;-			ConsoleWrite("$ReparseSubstituteName: " & @crlf)
+;-			ConsoleWrite(_HexEncode("0x"&$ReparseSubstituteName) & @crlf)
+			$ReparseSubstituteName = BinaryToString("0x"&$ReparseSubstituteName,2)
+			$ReparsePrintName = StringMid($Entry,($LocalAttributeOffset+32)+($ReparsePrintNameOffset*2),$ReparsePrintNameLength*2)
+;-			ConsoleWrite("$ReparsePrintName: " & @crlf)
+;-			ConsoleWrite(_HexEncode("0x"&$ReparsePrintName) & @crlf)
+			$ReparsePrintName = BinaryToString("0x"&$ReparsePrintName,2)
+		EndIf
+	EndIf
+	FileWriteLine($ReparsePointCsvFile, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $ReparseType & $de & $ReparseGuid & $de & "" & $de & $ReparseSubstituteName & $de & $ReparsePrintName & @CRLF)
+EndFunc
+
+Func _Get_Ea($Entry,$LocalAttributeOffset,$LocalAttributeSize)
+	Local $OffsetToNextEa,$EaFlags,$EaNameLength,$EaValueLength,$EaCounter=1
+
+	;ConsoleWrite("_Get_Ea()" & @CRLF)
+	$Entry = StringMid($Entry,$LocalAttributeOffset+48,($LocalAttributeSize*2)-48)
+	;ConsoleWrite(_HexEncode("0x"&$Entry) & @crlf)
+	$StringLengthInput = StringLen($Entry)
+	$LocalAttributeOffset = 1
+	$OffsetToNextEa = StringMid($Entry,$LocalAttributeOffset,8)
+	$OffsetToNextEa = Dec(_SwapEndian($OffsetToNextEa),2)
+	$EaFlags = "0x" & StringMid($Entry,$LocalAttributeOffset+8,2)
+	$EaNameLength = Dec(StringMid($Entry,$LocalAttributeOffset+10,2))
+	$EaValueLength = StringMid($Entry,$LocalAttributeOffset+12,4)
+	$EaValueLength = Dec(_SwapEndian($EaValueLength),2)
+	$EaName = StringMid($Entry,$LocalAttributeOffset+16,$EaNameLength*2)
+	$EaName = _HexToString($EaName)
+	$EaValue = StringMid($Entry,$LocalAttributeOffset+16+($EaNameLength*2)+2,$EaValueLength*2)
+	;ConsoleWrite("$OffsetToNextEa = " & $OffsetToNextEa & @crlf)
+	;ConsoleWrite("$EaFlags = " & $EaFlags & @crlf)
+	;ConsoleWrite("$EaNameLength = " & $EaNameLength & @crlf)
+	;ConsoleWrite("$EaValueLength = " & $EaValueLength & @crlf)
+	;ConsoleWrite("$EaName = " & $EaName & @crlf)
+	;ConsoleWrite("$EaValue:" & @crlf)
+	;ConsoleWrite(_HexEncode("0x"&$EaValue) & @crlf)
+
+	FileWriteLine($EaCsvFile, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $EaCounter & $de & $EaFlags & $de & $EaName & $de & $EaValueLength & $de & $EaValue & @CRLF)
+
+	If $OffsetToNextEa*2 >= $StringLengthInput Then
+		Return
+	EndIf
+
+	Do
+		$LocalAttributeOffset += $OffsetToNextEa*2
+		If $LocalAttributeOffset >= $StringLengthInput Then ExitLoop
+		$EaCounter+=1
+		$OffsetToNextEa = StringMid($Entry,$LocalAttributeOffset,8)
+		$OffsetToNextEa = Dec(_SwapEndian($OffsetToNextEa),2)
+		$EaFlags = "0x" & StringMid($Entry,$LocalAttributeOffset+8,2)
+		$EaNameLength = Dec(StringMid($Entry,$LocalAttributeOffset+10,2))
+		$EaValueLength = StringMid($Entry,$LocalAttributeOffset+12,4)
+		$EaValueLength = Dec(StringMid($EaValueLength,3,2) & StringMid($EaValueLength,1,2))
+		$EaName = StringMid($Entry,$LocalAttributeOffset+16,$EaNameLength*2)
+		$EaName = _HexToString($EaName)
+		$EaValue = StringMid($Entry,$LocalAttributeOffset+16+($EaNameLength*2),$EaValueLength*2)
+		If $EaNameLength = 0 Or $EaValueLength = 0 Then ExitLoop
+		;ConsoleWrite("$EaFlags = " & $EaFlags & @crlf)
+		;ConsoleWrite("$EaNameLength = " & $EaNameLength & @crlf)
+		;ConsoleWrite("$EaValueLength = " & $EaValueLength & @crlf)
+		;ConsoleWrite("$EaName = " & $EaName & @crlf)
+		;ConsoleWrite("$EaValue: " & @crlf)
+		;ConsoleWrite(_HexEncode("0x"&$EaValue) & @crlf)
+
+		FileWriteLine($EaCsvFile, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $EaCounter & $de & $EaFlags & $de & $EaName & $de & $EaValueLength & $de & $EaValue & @CRLF)
+
+	Until $LocalAttributeOffset >= $StringLengthInput
+EndFunc
+
+Func _WriteEaCsvHeader()
+	$Ea_Csv_Header = "MftRef"&$de&"MftRefSeqNo"&$de&"Counter"&$de&"EaFlags"&$de&"EaName"&$de&"EaValueLength"&$de&"EaValue"
+	FileWriteLine($EaCsvFile, $Ea_Csv_Header & @CRLF)
+EndFunc
+

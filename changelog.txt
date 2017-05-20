@@ -1,5 +1,10 @@
 Mft2Csv changelog
 
+v2.0.0.40
+Added missing reparse tags.
+Added complete decode of $REPARSE_POINT attribute into a separate csv.
+Added complete decode of $EA attribute into a separate csv.
+
 v2.0.0.39
 Moved the import sql files into the new import-sql sub directory so that compilation works with the project as is.
 
