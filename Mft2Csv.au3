@@ -1,11 +1,10 @@
-#RequireAdmin
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=C:\Program Files (x86)\AutoIt3\Icons\au3.ico
 #AutoIt3Wrapper_UseUpx=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.40
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.41
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -18,7 +17,8 @@
 ;
 ; by Joakim Schicht & Ddan
 ; parts by trancexxx, Ascend4nt & others
-Global $DummyPrependBytes = "00000000000000000000000000000000000000000000000000000000000000000000000000000000",$I30EntriesCsv,$RBICsv,$EntriesObjectIdCsvFile, $EntriesObjectIdCsv, $ReparsePointCsvFile, $ReparsePointCsv, $EaCsv, $EaCsvFile
+Global $DummyPrependBytes = "00000000000000000000000000000000000000000000000000000000000000000000000000000000",$I30EntriesCsv,$RBICsv,$EntriesObjectIdCsvFile, $EntriesObjectIdCsv, $ReparsePointCsvFile, $ReparsePointCsv
+Global $EaCsv, $EaCsvFile, $LoggedUtilityStreamTxfDataCsv, $LoggedUtilityStreamTxfDataCsvFile, $LoggedUtilityStreamCsv, $LoggedUtilityStreamCsvFile
 Global $_COMMON_KERNEL32DLL=DllOpen("kernel32.dll"), $separator="|", $PrecisionSeparator=".", $PrecisionSeparator2="", $dol2t=False, $DoDefaultAll=False, $DoBodyfile=False, $SkipFixups=False, $MftIsBroken=False, $ExtractResident=False, $OutputPath=@ScriptDir, $DoSplitCsv=False, $csvextra, $style, $TimestampStart
 Global $csv, $csvfile, $RecordOffset, $RecordOffsetDec, $Signature, $ADS, $FN_NamePath, $UTCconfig, $de="|", $MftFileSize, $FN_FileName, $LogicalClusterNumberforthefileMFT, $ClustersPerFileRecordSegment, $MftAttrListString, $BytesPerSector, $SplitMftRecArr[1]
 Global $HDR_LSN, $HDR_SequenceNo, $HDR_Flags, $HDR_RecRealSize, $HDR_RecAllocSize, $HDR_BaseRecord, $HDR_NextAttribID, $HDR_MFTREcordNumber, $HDR_HardLinkCount, $HDR_BaseRecSeqNo
@@ -110,12 +110,18 @@ Global $OverallProgress, $FileProgress, $CurrentProgress=-1, $ProgressStatus, $P
 Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Global $myctredit, $CheckUnicode, $CheckCsvSplit, $checkFixups, $checkBrokenMFT, $checkBruteForceSlack, $checkl2t, $checkbodyfile, $checkdefaultall, $SeparatorInput, $checkquotes
-$Progversion = "Mft2Csv 2.0.0.40"
+$Progversion = "Mft2Csv 2.0.0.41"
 If $cmdline[0] > 0 Then
 	$CommandlineMode = 1
 	ConsoleWrite($Progversion & @CRLF)
 	$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
 	_GetInputParams()
+
+	$OutputPath = $OutputPath&"\Mft2Csv_"&$TimestampStart
+	If DirCreate($OutputPath) = 0 Then
+		ConsoleWrite("Error creating: " & $OutputPath & @CRLF)
+		Exit
+	EndIf
 
 	$logfile = FileOpen($OutputPath & "\Mft_" & $TimestampStart & ".log",2+32)
 	If @error Then
@@ -171,6 +177,26 @@ If $cmdline[0] > 0 Then
 		Exit(1)
 	EndIf
 	_WriteEaCsvHeader()
+
+	;$LOGGED_UTILITY_STREAM
+	$LoggedUtilityStreamCsvFile = $OutputPath & "\Mft-LOGGED_UTILITY_STREAM_" & $TimestampStart & ".csv"
+	$LoggedUtilityStreamCsv = FileOpen($LoggedUtilityStreamCsvFile, $EncodingWhenOpen)
+	If @error Then
+		ConsoleWrite("Error opening: " & $LoggedUtilityStreamCsvFile & @CRLF)
+		MsgBox(0, "Error", "Error opening: " & $LoggedUtilityStreamCsvFile)
+		Exit(1)
+	EndIf
+	_WriteLoggedUtilityStreamCsvHeader()
+
+	;$LOGGED_UTILITY_STREAM:$TXF_DATA
+	$LoggedUtilityStreamTxfDataCsvFile = $OutputPath & "\Mft-TXF_DATA_" & $TimestampStart & ".csv"
+	$LoggedUtilityStreamTxfDataCsv = FileOpen($LoggedUtilityStreamTxfDataCsvFile, $EncodingWhenOpen)
+	If @error Then
+		ConsoleWrite("Error opening: " & $LoggedUtilityStreamTxfDataCsvFile & @CRLF)
+		MsgBox(0, "Error", "Error opening: " & $LoggedUtilityStreamTxfDataCsvFile)
+		Exit(1)
+	EndIf
+	_WriteTxfDataCsvHeader()
 
 Else
 	DllCall("kernel32.dll", "bool", "FreeConsole")
@@ -269,6 +295,14 @@ Else
 	$tDelta = $tDelta*-1 ;Since delta is substracted from timestamp later on
 
 	$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
+
+	$OutputPath = $OutputPath&"\Mft2Csv_"&$TimestampStart
+	If DirCreate($OutputPath) = 0 Then
+		ConsoleWrite("Error creating: " & $OutputPath & @CRLF)
+		MsgBox(0, "Error", "Error creating: " & $OutputPath)
+		Exit(1)
+	EndIf
+
 	$logfile = FileOpen($OutputPath & "\Mft_" & $TimestampStart & ".log",2+32)
 	If @error Then
 		ConsoleWrite("Error opening: " & $OutputPath & "\Mft_" & $TimestampStart & ".log" & @CRLF)
@@ -324,6 +358,26 @@ Else
 		Exit(1)
 	EndIf
 	_WriteEaCsvHeader()
+
+	;$LOGGED_UTILITY_STREAM
+	$LoggedUtilityStreamCsvFile = $OutputPath & "\Mft-LOGGED_UTILITY_STREAM_" & $TimestampStart & ".csv"
+	$LoggedUtilityStreamCsv = FileOpen($LoggedUtilityStreamCsvFile, $EncodingWhenOpen)
+	If @error Then
+		ConsoleWrite("Error opening: " & $LoggedUtilityStreamCsvFile & @CRLF)
+		MsgBox(0, "Error", "Error opening: " & $LoggedUtilityStreamCsvFile)
+		Exit(1)
+	EndIf
+	_WriteLoggedUtilityStreamCsvHeader()
+
+	;$LOGGED_UTILITY_STREAM:$TXF_DATA
+	$LoggedUtilityStreamTxfDataCsvFile = $OutputPath & "\Mft-TXF_DATA_" & $TimestampStart & ".csv"
+	$LoggedUtilityStreamTxfDataCsv = FileOpen($LoggedUtilityStreamTxfDataCsvFile, $EncodingWhenOpen)
+	If @error Then
+		ConsoleWrite("Error opening: " & $LoggedUtilityStreamTxfDataCsvFile & @CRLF)
+		MsgBox(0, "Error", "Error opening: " & $LoggedUtilityStreamTxfDataCsvFile)
+		Exit(1)
+	EndIf
+	_WriteTxfDataCsvHeader()
 
 	Select
 		Case $IsImage
@@ -431,7 +485,7 @@ EndFunc
 Func _ExtractSystemfile()
 	Local $nBytes
 	Global $DataQ[1], $RUN_VCN[1], $RUN_Clusters[1]
-	$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
+	;$TimestampStart = @YEAR & "-" & @MON & "-" & @MDAY & "_" & @HOUR & "-" & @MIN & "-" & @SEC
 
 	If $CommandlineMode Then
 		$CheckUnicode = $CheckUnicode
@@ -785,6 +839,14 @@ Func _ExtractSystemfile()
 		FileMove($EaCsvFile,$EaCsvFile&".empty",1)
 		_DebugOut("Empty output: " & $EaCsvFile & " is postfixed with .empty")
 	EndIf
+	If (_FileCountLines($LoggedUtilityStreamCsvFile) < 2) Then
+		FileMove($LoggedUtilityStreamCsvFile,$LoggedUtilityStreamCsvFile&".empty",1)
+		_DebugOut("Empty output: " & $LoggedUtilityStreamCsvFile & " is postfixed with .empty")
+	EndIf
+	If (_FileCountLines($LoggedUtilityStreamTxfDataCsvFile) < 2) Then
+		FileMove($LoggedUtilityStreamTxfDataCsvFile,$LoggedUtilityStreamTxfDataCsvFile&".empty",1)
+		_DebugOut("Empty output: " & $LoggedUtilityStreamTxfDataCsvFile & " is postfixed with .empty")
+	EndIf
 	_DebugOut("Finished processing " & $Total & " records.")
 EndFunc
 
@@ -908,7 +970,9 @@ Func _DoFileTree()
 		Next
 	Next
 	AdlibUnRegister()
-	$FileTree[5] = ":"
+	If UBound($FileTree) > 5 Then
+		$FileTree[5] = ":"
+	EndIf
 	$begin = TimerInit()
 	AdlibRegister("_FolderStrucProgress", 500)
 	For $i = 0 to UBound($FileTree)-1
@@ -939,7 +1003,9 @@ Func _DoFileTree()
 			$FileTree[$i] = StringTrimRight($str,1)
 		EndIf
 	Next
-	$FileTree[5] &= "\"
+	If UBound($FileTree) > 5 Then
+		$FileTree[5] &= "\"
+	EndIf
 	AdlibUnRegister()
 EndFunc
 
@@ -1710,7 +1776,12 @@ Func _ParserCodeOldVersion($MFTEntry)
 			Case $AttributeType = $LOGGED_UTILITY_STREAM
 				$AttributeKnown = 1
 				$LUS_ON = 1
-				;			_Get_LoggedUtilityStream()
+				$CoreAttr = _GetAttributeEntry(StringMid($MFTEntry, $NextAttributeOffset, $AttributeSize*2))
+				$CoreAttrChunk = $CoreAttr[0]
+				$CoreAttrName = $CoreAttr[1]
+				If $CoreAttrChunk <> "" Then
+					_Get_LoggedUtilityStream($CoreAttrChunk, $CoreAttrName)
+				EndIf
 
 			Case $AttributeType = $ATTRIBUTE_END_MARKER
 				$AttributeKnown = 0
@@ -2962,11 +3033,6 @@ Func _Get_PropertySet()
 	Return
 EndFunc   ;==>_Get_PropertySet
 
-Func _Get_LoggedUtilityStream()
-;	ConsoleWrite("Get_LoggedUtilityStream Function not implemented yet." & @CRLF)
-	Return
-EndFunc   ;==>_Get_LoggedUtilityStream
-
 Func _ClearVar()
 	$SI_ON = 0
 	$AL_ON = 0
@@ -4139,3 +4205,100 @@ Func _WriteEaCsvHeader()
 	FileWriteLine($EaCsvFile, $Ea_Csv_Header & @CRLF)
 EndFunc
 
+Func _Get_LoggedUtilityStream($Entry,$CurrentAttributeName)
+	Local $LocalAttributeOffset = 1
+	$TheLoggedUtilityStream = StringMid($Entry,$LocalAttributeOffset)
+
+	;ConsoleWrite("_Get_LoggedUtilityStream():" & @CRLF)
+	;ConsoleWrite("$TheLoggedUtilityStream = " & $TheLoggedUtilityStream & @crlf)
+
+	FileWriteLine($LoggedUtilityStreamCsvFile, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $CurrentAttributeName & $de & BinaryLen("0x"&$TheLoggedUtilityStream) & @CRLF)
+
+	If $CurrentAttributeName = "$TXF_DATA" Then
+		_Decode_TXF_DATA($TheLoggedUtilityStream)
+	EndIf
+EndFunc
+
+Func _GetAttributeEntry($Entry)
+	Local $CoreAttribute,$CoreAttributeTmp,$CoreAttributeArr[3]
+	Local $ATTRIBUTE_HEADER_LengthOfAttribute,$ATTRIBUTE_HEADER_OffsetToAttribute,$ATTRIBUTE_HEADER_Length, $ATTRIBUTE_HEADER_NonResidentFlag, $ATTRIBUTE_HEADER_NameLength, $ATTRIBUTE_HEADER_NameRelativeOffset, $ATTRIBUTE_HEADER_Name
+	$ATTRIBUTE_HEADER_Length = StringMid($Entry,9,8)
+	$ATTRIBUTE_HEADER_Length = Dec(_SwapEndian($ATTRIBUTE_HEADER_Length),2)
+	$ATTRIBUTE_HEADER_NonResidentFlag = Dec(StringMid($Entry,17,2))
+	$ATTRIBUTE_HEADER_NameLength = Dec(StringMid($Entry,19,2))
+	$ATTRIBUTE_HEADER_NameRelativeOffset = StringMid($Entry,21,4)
+	$ATTRIBUTE_HEADER_NameRelativeOffset = Dec(_SwapEndian($ATTRIBUTE_HEADER_NameRelativeOffset))
+	If $ATTRIBUTE_HEADER_NameLength > 0 Then
+		$ATTRIBUTE_HEADER_Name = BinaryToString("0x"&StringMid($Entry,$ATTRIBUTE_HEADER_NameRelativeOffset*2 + 1,$ATTRIBUTE_HEADER_NameLength*4),2)
+	Else
+		$ATTRIBUTE_HEADER_Name = ""
+	EndIf
+	If $ATTRIBUTE_HEADER_NonResidentFlag = 0 Then
+		$ATTRIBUTE_HEADER_LengthOfAttribute = StringMid($Entry,33,8)
+		$ATTRIBUTE_HEADER_LengthOfAttribute = Dec(_SwapEndian($ATTRIBUTE_HEADER_LengthOfAttribute),2)
+		$ATTRIBUTE_HEADER_OffsetToAttribute = Dec(_SwapEndian(StringMid($Entry,41,4)))
+		$CoreAttribute = StringMid($Entry,$ATTRIBUTE_HEADER_OffsetToAttribute*2+1,$ATTRIBUTE_HEADER_LengthOfAttribute*2)
+	Else
+		$CoreAttribute = ""
+	EndIf
+	$CoreAttributeArr[0] = $CoreAttribute
+	$CoreAttributeArr[1] = $ATTRIBUTE_HEADER_Name
+	$CoreAttributeArr[2] = $ATTRIBUTE_HEADER_NonResidentFlag
+	Return $CoreAttributeArr
+EndFunc
+
+Func _Decode_TXF_DATA($InputData)
+	Local $StartOffset = 1, $InputDataSize, $MftRef_RM_Root, $MftRefSeqNo_RM_Root, $UsnIndex, $TxfFileId, $LsnUserData, $LsnNtfsMetadata, $LsnDirectoryIndex, $UnknownFlag
+
+	$InputDataSize = StringLen($InputData)
+
+	;ConsoleWrite("_Decode_TXF_DATA():" & @CRLF)
+	;ConsoleWrite(_HexEncode("0x"&$InputData) & @CRLF)
+
+	$MftRef_RM_Root = StringMid($InputData, $StartOffset, 12)
+	$MftRef_RM_Root = Dec(_SwapEndian($MftRef_RM_Root),2)
+	$MftRefSeqNo_RM_Root = StringMid($InputData, $StartOffset + 12, 4)
+	$MftRefSeqNo_RM_Root = Dec(_SwapEndian($MftRefSeqNo_RM_Root),2)
+
+	$UsnIndex = StringMid($InputData, $StartOffset + 16, 16)
+	$UsnIndex = "0x"&_SwapEndian($UsnIndex)
+
+	;Increments with 1. The last TxfFileId is referenced in $Tops standard $DATA stream at offset 0x28
+	$TxfFileId = StringMid($InputData, $StartOffset + 32, 16)
+	$TxfFileId = "0x"&_SwapEndian($TxfFileId)
+
+	;Offset into $TxfLogContainer00000000000000000001
+	$LsnUserData = StringMid($InputData, $StartOffset + 48, 16)
+	$LsnUserData = "0x"&_SwapEndian($LsnUserData)
+
+	;Offset into $TxfLogContainer00000000000000000001
+	$LsnNtfsMetadata = StringMid($InputData, $StartOffset + 64, 16)
+	$LsnNtfsMetadata = "0x"&_SwapEndian($LsnNtfsMetadata)
+
+	$LsnDirectoryIndex = StringMid($InputData, $StartOffset + 80, 16)
+	$LsnDirectoryIndex = "0x"&_SwapEndian($LsnDirectoryIndex)
+
+	$UnknownFlag = StringMid($InputData, $StartOffset + 96, 16)
+	$UnknownFlag = "0x"&_SwapEndian($UnknownFlag)
+
+	;ConsoleWrite("$MftRef_RM_Root: " & $MftRef_RM_Root & @CRLF)
+	;ConsoleWrite("$MftRefSeqNo_RM_Root: " & $MftRefSeqNo_RM_Root & @CRLF)
+	;ConsoleWrite("$UsnIndex: " & $UsnIndex & @CRLF)
+	;ConsoleWrite("$TxfFileId: " & $TxfFileId & @CRLF)
+	;ConsoleWrite("$LsnUserData: " & $LsnUserData & @CRLF)
+	;ConsoleWrite("$LsnNtfsMetadata: " & $LsnNtfsMetadata & @CRLF)
+	;ConsoleWrite("$LsnDirectoryIndex: " & $LsnDirectoryIndex & @CRLF)
+
+	FileWriteLine($LoggedUtilityStreamTxfDataCsvFile, $HDR_MFTREcordNumber&$de&$HDR_SequenceNo&$de&$MftRef_RM_Root&$de&$MftRefSeqNo_RM_Root&$de&$UsnIndex&$de&$TxfFileId&$de&$LsnUserData&$de&$LsnNtfsMetadata&$de&$LsnDirectoryIndex&$de&$UnknownFlag)
+
+EndFunc
+
+Func _WriteTxfDataCsvHeader()
+	$TxfData_Csv_Header = "MftRef"&$de&"MftRefSeqNo"&$de&"MftRef_RM_Root"&$de&"MftRefSeqNo_RM_Root"&$de&"UsnIndex"&$de&"TxfFileId"&$de&"LsnUserData"&$de&"LsnNtfsMetadata"&$de&"LsnDirectoryIndex"&$de&"UnknownFlag"
+	FileWriteLine($LoggedUtilityStreamTxfDataCsvFile, $TxfData_Csv_Header & @CRLF)
+EndFunc
+
+Func _WriteLoggedUtilityStreamCsvHeader()
+	$LoggedUtilityStream_Csv_Header = "MftRef"&$de&"MftRefSeqNo"&$de&"StreamName"&$de&"StreamSize"
+	FileWriteLine($LoggedUtilityStreamCsvFile, $LoggedUtilityStream_Csv_Header & @CRLF)
+EndFunc

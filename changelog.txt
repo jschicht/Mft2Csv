@@ -1,5 +1,11 @@
 Mft2Csv changelog
 
+v2.0.0.41
+Implemented new subdirectory in output directory for all output.
+Added decode of $LOGGED_UTILITY_STREAM attribute into 2 new csv files.
+Fixed a bug that caused a program crash when running in commandline mode and input file was a single extracted record.
+Removed RequireAdmin from program manifest as it is not needed when run on already extracted $MFT, single extracted records or image files.
+
 v2.0.0.40
 Added missing reparse tags.
 Added complete decode of $REPARSE_POINT attribute into a separate csv.

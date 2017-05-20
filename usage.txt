@@ -1,4 +1,4 @@
-Main Wiki: http://code.google.com/p/mft2csv/wiki/mft2csv
+Main Wiki: https://github.com/jschicht/Mft2Csv/wiki/Mft2Csv
 
 Usage scenarios:
 
@@ -39,7 +39,7 @@ Press "Start Processing".
 Run MFTCarver on the memory dump file, and output a pseudo $MFT file.
 Press "Choose $MFT" and browse to the file you just created.
 Configure the stuff mentioned at the top.
-Configure "Skip Fixups".
+Configure "Skip Fixups" according to what type of file MftCarver output.
 Configure "Broken $MFT".
 Press "Start Processing".
 
@@ -53,6 +53,11 @@ Press the button "Scan Shadows", and watch any found shadow copies in the top co
 When correct one chosen, confiure the rest of the necessary stuff like already explained.
 Press "Start Processing".
 
+8. Parse a single record. Copy the record with a hex editor or use MftRcrd with the -w switch.
+Press "Choose $MFT" and browse to the file you just created.
+Configure the stuff mentioned at the top.
+Configure "Broken $MFT".
+Press "Start Processing".
 
 Note about extracted resident data
 The extracted files must obviously have the nonresident flag set to 00. Regular files and alternate data streams are supported. These can be up to about 700 bytes in size. They are extracted to their original name, but no folder structure is regenerated. To reduce the risk of overwriting files with similar filenames and to help identify where in the $MFT the file was extracted from, the $MFT offset will be prefixed to the filename like for instance:
@@ -158,5 +163,6 @@ Mft2Csv.exe /Volume:e: /TimeZone:3.00 /RecordSize:4096 /TSFormat:1 /TSPrecision:
 Mft2Csv.exe /Volume:e: /TSFormat:2 /TSPrecision:None
 Mft2Csv.exe /MftFile:c:\temp\$MFT /ExtractResident:1 /OutputPath:c:\temp\MftOutput
 Mft2Csv.exe /MftFile:c:\temp\$MFT /TSPrecision:NanoSec /ScanSlack:1 /OutputPath:c:\temp\MftOutput
+Mft2Csv.exe /MftFile:c:\temp\Record_c_67.bin
 
 Last example is a basic that uses common defaults that work out just fine in most cases. Also compatible with MySql imports.
