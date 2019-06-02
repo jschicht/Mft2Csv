@@ -1,10 +1,12 @@
 #Region ;**** Directives created by AutoIt3Wrapper_GUI ****
 #AutoIt3Wrapper_Icon=C:\Program Files (x86)\AutoIt3\Icons\au3.ico
+#AutoIt3Wrapper_Outfile=Mft2Csv.exe
+#AutoIt3Wrapper_Outfile_x64=Mft2Csv64.exe
 #AutoIt3Wrapper_UseUpx=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.41
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.42
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #EndRegion ;**** Directives created by AutoIt3Wrapper_GUI ****
 
@@ -38,6 +40,7 @@ Global $DT_LengthOfAttribute, $DT_OffsetToAttribute, $DT_IndexedFlag, $DT_Length
 Global $hFile, $nBytes, $MSecTest, $CTimeTest, $SI_MaxVersions, $SI_VersionNumber, $SI_ClassID, $SI_OwnerID, $SI_SecurityID, $SI_HEADER_Flags, $SI_ON, $AL_ON, $FN_ON, $OI_ON, $SD_ON, $VN_ON, $VI_ON, $DT_ON, $IR_ON, $IA_ON, $BITMAP_ON, $RP_ON, $EAI_ON, $EA_ON, $PS_ON, $LUS_ON
 Global $GUID_ObjectID, $GUID_BirthVolumeID, $GUID_BirthObjectID, $GUID_DomainID, $VOLUME_NAME_NAME, $VOL_INFO_NTFS_VERSION, $VOL_INFO_FLAGS, $INV_FNAME, $INV_FNAME_2, $INV_FNAME_3, $DT_Number
 Global $FileSizeBytes, $IntegrityCheck, $ComboPhysicalDrives, $IsPhysicalDrive=False,$GlobalRefCounter=0,$IsShadowCopy=False,$EncodingWhenOpen=2,$DoBruteForceSlack=0
+Global $SI_CTime_tmp, $FN_CTime_tmp
 ;Global $TimestampErrorVal = "-"
 Global $TimestampErrorVal = "0000-00-00 00:00:00"
 ;Global $TimestampErrorVal = "9999-12-31 00:00:00"
@@ -110,7 +113,7 @@ Global $OverallProgress, $FileProgress, $CurrentProgress=-1, $ProgressStatus, $P
 Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Global $myctredit, $CheckUnicode, $CheckCsvSplit, $checkFixups, $checkBrokenMFT, $checkBruteForceSlack, $checkl2t, $checkbodyfile, $checkdefaultall, $SeparatorInput, $checkquotes
-$Progversion = "Mft2Csv 2.0.0.41"
+$Progversion = "Mft2Csv 2.0.0.42"
 If $cmdline[0] > 0 Then
 	$CommandlineMode = 1
 	ConsoleWrite($Progversion & @CRLF)
@@ -793,7 +796,7 @@ Func _ExtractSystemfile()
 		_ParserCodeOldVersion($MFTEntry)
 		If $DT_Number > 0 Then $ADS = $DT_Number - 1
 		$RecordOffset = "0x" & Hex($RecordOffsetDec)
-		$CTimeTest = _Test_SI2FN_CTime($SI_CTime, $FN_CTime)
+		$CTimeTest = _Test_SI2FN_CTime()
 		If $DoDefaultAll Then
 			If $checkquotes = 1 Then
 				_WriteCSVwithQuotes()
@@ -3234,8 +3237,8 @@ Func _Test_MilliSec($timestamp)
 	Return $MSecTest
 EndFunc   ;==>_Test_MilliSec
 
-Func _Test_SI2FN_CTime($SI_CTime, $FN_CTime)
-	If $SI_CTime < $FN_CTime Then
+Func _Test_SI2FN_CTime()
+	If $SI_CTime_tmp < $FN_CTime_tmp Then
 		$CTimeTest = 1
 	Else
 		$CTimeTest = 0
