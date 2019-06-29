@@ -3,6 +3,8 @@
 #AutoIt3Wrapper_Outfile=Mft2Csv.exe
 #AutoIt3Wrapper_Outfile_x64=Mft2Csv64.exe
 #AutoIt3Wrapper_UseUpx=y
+#AutoIt3Wrapper_Compile_Both=y
+#AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
