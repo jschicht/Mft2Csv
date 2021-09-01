@@ -1,5 +1,14 @@
 Mft2Csv changelog
 
+v2.0.0.43
+Added option to extract slack. Related changes in commandline. see readme.
+Added new column for datarun in output ($DATA for files and $I30 for directories).
+Added new output for $INDEX_ROOT/$I30, including parsing of slack. 
+Fixed a bug with resident extract and overwrite in output with similar names.
+
+v2.0.0.42
+Fixed bug in CTimeTest.
+
 v2.0.0.41
 Implemented new subdirectory in output directory for all output.
 Added decode of $LOGGED_UTILITY_STREAM attribute into 2 new csv files.
