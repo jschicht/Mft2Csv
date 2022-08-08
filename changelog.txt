@@ -1,5 +1,22 @@
 Mft2Csv changelog
 
+v2.0.0.44
+Added support for large sized clusters (+64k).
+Added decode of certain $EA values like $CI.CATALOGHINT.
+Added some translation for WOF type $REPARSE_POINT.
+Added full decode of $REPARSE_POINT type APPEXECLINK, including a separate output.
+Removed duplicated last entry in file mode.
+Added missing DT_Datarun field in Mft-schema.sql.
+Added full decode of all $DATA attributes to separate output (earlier version covered up to 3).
+Changed logic for interpreting header flags (file, folder, deleted etc). Changes in HEADER_Flags field.
+Minor changes in decode of file attributes.
+Minor changes in the decode of volume info flags.
+Fixed wrong permission on sharing in CreateFile with direct access on shadow copies and read-only mounted volumes.
+Removal of unused variables and some reshuffling of code for readability.
+GUI bugfixes and various improvements.
+Moved compiled exe's to release packages.
+Changed license to MIT.
+
 v2.0.0.43
 Added option to extract slack. Related changes in commandline. see readme.
 Added new column for datarun in output ($DATA for files and $I30 for directories).
