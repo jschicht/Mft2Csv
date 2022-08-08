@@ -338,23 +338,7 @@ Func _ExtractSystemfile()
 
 	Global $DataQ[1], $RUN_VCN[1], $RUN_Clusters[1]
 
-	If $CommandlineMode Then
-;		$CheckUnicode = $CheckUnicode
-;		;$TimestampErrorVal = $TimestampErrorVal
-;		$PrecisionSeparator = $PrecisionSeparator
-;		$PrecisionSeparator2 = $PrecisionSeparator2
-;		$CheckCsvSplit = $CheckCsvSplit
-;		$checkFixups = $checkFixups
-;		$checkBruteForceSlack = $checkBruteForceSlack
-;		$checkBrokenMFT = $checkBrokenMFT
-;		$checkExtractResidentData = $checkExtractResidentData
-;		$checkExtractResidentSlack = $checkExtractResidentSlack
-;		$checkl2t = $checkl2t
-;		$checkbodyfile = $checkbodyfile
-;		$checkdefaultall = $checkdefaultall
-;		$SeparatorInput = $SeparatorInput
-;		$checkquotes = $checkquotes
-	Else
+	If Not $CommandlineMode Then
 		$CheckUnicode = GUICtrlRead($CheckUnicode)
 		;$TimestampErrorVal = GUICtrlRead($TimestampErrorInput)
 		;$TimestampErrorVal = $TimestampErrorVal
@@ -366,9 +350,6 @@ Func _ExtractSystemfile()
 		$checkBrokenMFT = GUICtrlRead($checkBrokenMFT)
 		$checkExtractResidentData = GUICtrlRead($checkExtractResidentData)
 		$checkExtractResidentSlack = GUICtrlRead($checkExtractResidentSlack)
-;		$checkl2t = GUICtrlRead($checkl2t)
-;		$checkbodyfile = GUICtrlRead($checkbodyfile)
-;		$checkdefaultall = GUICtrlRead($checkdefaultall)
 		$sOutputFormat = GUICtrlRead($ComboOutputFormat)
 		$SeparatorInput = GUICtrlRead($SeparatorInput)
 		$checkquotes = GUICtrlRead($checkquotes)
