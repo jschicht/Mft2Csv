@@ -1,5 +1,12 @@
 Mft2Csv changelog
 
+v2.0.0.45
+Fixed a bug where the column headers were missing.
+Fixed a bug that caused inconsistent file encoding.
+Simplified the handling of file handles and file names.
+Removed timestamps from output files in order to simplify and keep only 1 output path timestamp.
+Version verified with AutoIt v3.3.16.0.
+
 v2.0.0.44
 Added support for large sized clusters (+64k).
 Added decode of certain $EA values like $CI.CATALOGHINT.

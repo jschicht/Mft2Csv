@@ -4,10 +4,11 @@
 #AutoIt3Wrapper_Outfile=Mft2Csv.exe
 #AutoIt3Wrapper_Outfile_x64=Mft2Csv64.exe
 #AutoIt3Wrapper_Compile_Both=y
+#AutoIt3Wrapper_UseX64=y
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.44
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.45
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #AutoIt3Wrapper_AU3Check_Parameters=-w 3 -w 5
 #AutoIt3Wrapper_Run_Au3Stripper=y
@@ -25,17 +26,19 @@
 #include <ComboConstants.au3>
 #include <FontConstants.au3>
 
-Global $Progversion = "Mft2Csv 2.0.0.44"
+Global $Progversion = "Mft2Csv 2.0.0.45"
 
 ; parts by Ddan, trancexxx, Ascend4nt & others
 
 Global $DummyPrependBytes = "00000000000000000000000000000000000000000000000000000000000000000000000000000000"
 ; output structure & csv
-Global $OutputPath = @ScriptDir
-Global $csv, $csvfile, $I30EntriesCsv, $I30EntriesCsvFile
-Global $RBICsv,$RBICsvFile,$EntriesObjectIdCsvFile, $EntriesObjectIdCsv, $ReparsePointCsvFile, $ReparsePointCsv, $ReparsePointAppExecLinkCsvFile, $ReparsePointAppExecLinkCsv
-Global $EaCsv, $EaCsvFile, $LoggedUtilityStreamTxfDataCsv, $LoggedUtilityStreamTxfDataCsvFile, $LoggedUtilityStreamCsv, $LoggedUtilityStreamCsvFile, $NewI30EntriesCsv, $NewI30EntriesCsvFile, $AdditionalDataCsvFile, $AdditionalDataCsv
-Global $DoSplitCsv=False, $csvextra
+Global $OutputPath = @ScriptDir, $DoSplitCsv=False
+; file handles
+Global $csv, $I30EntriesCsv, $RBICsv, $EntriesObjectIdCsv, $ReparsePointCsv, $ReparsePointAppExecLinkCsv, $EaCsv, $LoggedUtilityStreamTxfDataCsv, $LoggedUtilityStreamCsv, $NewI30EntriesCsv, $AdditionalDataCsv, $csvExtra
+; file names
+Global $csvFile, $I30EntriesCsvFile, $RBICsvFile, $EntriesObjectIdCsvFile, $ReparsePointCsvFile, $ReparsePointAppExecLinkCsvFile, $EaCsvFile, $LoggedUtilityStreamTxfDataCsvFile, $LoggedUtilityStreamCsvFile, $NewI30EntriesCsvFile, $AdditionalDataCsvFile, $csvExtraFile
+; arrays will be populated at file creation
+Global $aFileNameAndHandle[0][2] ; FileName, FileHandle
 
 Global $_COMMON_KERNEL32DLL=DllOpen("kernel32.dll"), $separator="|", $PrecisionSeparator=".", $PrecisionSeparator2="", $dol2t=False, $DoDefaultAll=False, $DoBodyfile=False, $SkipFixups=False, $MftIsBroken=False, $ExtractResidentData=False, $ExtractResidentSlack=False, $style
 Global $RecordOffset, $RecordOffsetDec, $Signature, $ADS, $FN_NamePath, $UTCconfig, $de="|", $MftFileSize, $FN_FileName, $LogicalClusterNumberforthefileMFT, $ClustersPerFileRecordSegment, $MftAttrListString, $BytesPerSector, $SplitMftRecArr[1]
@@ -257,11 +260,6 @@ Else
 
 EndIf
 
-; Create output
-_CreateOutputStructureAndFiles()
-
-_DebugOut("Timestamps presented in UTC " & $UTCconfig)
-
 ; start our timer
 Local $hTimer = TimerInit()
 
@@ -356,6 +354,12 @@ Func _ExtractSystemfile()
 		$MFT_Record_Size = GUICtrlRead($ComboRecordSize)
 	EndIf
 
+
+	If $CheckCsvSplit = 1 Then
+		$DoSplitCsv = True
+		_DebugOut("Splitting csv")
+	EndIf
+
 	If $CheckUnicode = 1 Then
 		$EncodingWhenOpen = 2+128
 		_DebugOut("UNICODE configured")
@@ -364,6 +368,28 @@ Func _ExtractSystemfile()
 		_DebugOut("ANSI configured")
 	EndIf
 
+	Select
+		Case $sOutputFormat = "all"
+			$DoDefaultAll = True
+		Case $sOutputFormat = "bodyfile"
+			$DoBodyfile = True
+		Case $sOutputFormat = "log2timeline"
+			$Dol2t = True
+		Case Else
+			_DebugOut("Error: unexpected output format: " & $sOutputFormat)
+			Return SetError(1)
+	EndSelect
+
+	If $checkquotes = 1 Then
+		_DebugOut("Writing variables surrounded with qoutes")
+	Else
+		_DebugOut("Writing variables without surrounding qoutes")
+	EndIf
+
+	; Create output
+	;_CreateOutputStructureAndFiles()
+
+	_DebugOut("Timestamps presented in UTC " & $UTCconfig)
 	_DebugOut("Timestamp Precision: " & $TimestampPrecision)
 
 	If StringLen($PrecisionSeparator) <> 1 Then
@@ -375,11 +401,6 @@ Func _ExtractSystemfile()
 	EndIf
 
 	If Not $CommandlineMode Then _TranslateTimestamp()
-
-	If $CheckCsvSplit = 1 Then
-		$DoSplitCsv = True
-		_DebugOut("Splitting csv")
-	EndIf
 
 	If $checkFixups = 1 Then
 		$SkipFixups = True
@@ -407,18 +428,6 @@ Func _ExtractSystemfile()
 		_DebugOut("Extracting resident slack")
 	EndIf
 
-	Select
-		Case $sOutputFormat = "all"
-			$DoDefaultAll = True
-		Case $sOutputFormat = "bodyfile"
-			$DoBodyfile = True
-		Case $sOutputFormat = "log2timeline"
-			$Dol2t = True
-		Case Else
-			_DebugOut("Error: unexpected output format: " & $sOutputFormat)
-			Return SetError(1)
-	EndSelect
-
 	If StringLen($SeparatorInput) <> 1 Then
 		If Not $CommandlineMode Then _DisplayInfo("Error: Separator not set properly" & @crlf)
 		_DebugOut("Error: Separator not set properly: " & $SeparatorInput)
@@ -428,11 +437,8 @@ Func _ExtractSystemfile()
 		_DebugOut("Using separator: " & $de)
 	EndIf
 
-	If $checkquotes = 1 Then
-		_DebugOut("Writing variables surrounded with qoutes")
-	Else
-		_DebugOut("Writing variables without surrounding qoutes")
-	EndIf
+	; Create output
+	_CreateOutputStructureAndFiles()
 
 	If (Not $IsImage and Not $IsMftFile and Not $IsShadowCopy) Then
 		If DriveGetFileSystem($TargetDrive) <> "NTFS" Then		;read boot sector and extract $MFT data
@@ -620,7 +626,7 @@ Func _ExtractSystemfile()
 			EndIf
 		EndIf
 		$Signature = ""
-		If Not Mod($i,50000) Then
+		If Not Mod($i, 50000) Then
 			FileFlush($csv)
 		EndIf
 	Next
@@ -629,67 +635,20 @@ Func _ExtractSystemfile()
 	AdlibUnRegister()
 	GUIDelete($Progress)
 
-	; only check line count for smaller sized output
-	If Not FileGetSize($RBICsvFile) > 100000 Then
-		If (_FileCountLines($RBICsvFile) < 2) Then
-			FileMove($RBICsvFile,$RBICsvFile&".empty",1)
-			_DebugOut("Empty output: " & $RBICsvFile & " is postfixed with .empty")
+	; close csv handles
+	For $x = 0 To UBound($aFileNameAndHandle) - 1
+		FileClose($aFileNameAndHandle[$x][1])
+	Next
+
+	; count the lines of small sized files, and rename if empty
+	For $x = 0 To UBound($aFileNameAndHandle) - 1
+		If FileGetSize($aFileNameAndHandle[$x][0]) < 100000 Then
+			If (_FileCountLines($aFileNameAndHandle[$x][0]) < 2) Then
+				FileMove($aFileNameAndHandle[$x][0], $aFileNameAndHandle[$x][0] & ".empty", 1)
+				_DebugOut("Empty output: " & $aFileNameAndHandle[$x][0] & " is now postfixed with .empty")
+			EndIf
 		EndIf
-	EndIf
-	If Not FileGetSize($I30EntriesCsvFile) > 100000 Then
-		If (_FileCountLines($I30EntriesCsvFile) < 2) Then
-			FileMove($I30EntriesCsvFile,$I30EntriesCsvFile&".empty",1)
-			_DebugOut("Empty output: " & $I30EntriesCsvFile & " is postfixed with .empty")
-		EndIf
-	EndIf
-	If Not FileGetSize($NewI30EntriesCsvFile) > 100000 Then
-		If (_FileCountLines($NewI30EntriesCsvFile) < 2) Then
-			FileMove($NewI30EntriesCsvFile,$NewI30EntriesCsvFile&".empty",1)
-			_DebugOut("Empty output: " & $NewI30EntriesCsvFile & " is postfixed with .empty")
-		EndIf
-	EndIf
-	If Not FileGetSize($EntriesObjectIdCsvFile) > 100000 Then
-		If (_FileCountLines($EntriesObjectIdCsvFile) < 2) Then
-			FileMove($EntriesObjectIdCsvFile,$EntriesObjectIdCsvFile&".empty",1)
-			_DebugOut("Empty output: " & $EntriesObjectIdCsvFile & " is postfixed with .empty")
-		EndIf
-	EndIf
-	If Not FileGetSize($ReparsePointCsvFile) > 100000 Then
-		If (_FileCountLines($ReparsePointCsvFile) < 2) Then
-			FileMove($ReparsePointCsvFile,$ReparsePointCsvFile&".empty",1)
-			_DebugOut("Empty output: " & $ReparsePointCsvFile & " is postfixed with .empty")
-		EndIf
-	EndIf
-	If Not FileGetSize($ReparsePointAppExecLinkCsvFile) > 100000 Then
-		If (_FileCountLines($ReparsePointAppExecLinkCsvFile) < 2) Then
-			FileMove($ReparsePointAppExecLinkCsvFile,$ReparsePointAppExecLinkCsvFile&".empty",1)
-			_DebugOut("Empty output: " & $ReparsePointAppExecLinkCsvFile & " is postfixed with .empty")
-		EndIf
-	EndIf
-	If Not FileGetSize($EaCsvFile) > 100000 Then
-		If (_FileCountLines($EaCsvFile) < 2) Then
-			FileMove($EaCsvFile,$EaCsvFile&".empty",1)
-			_DebugOut("Empty output: " & $EaCsvFile & " is postfixed with .empty")
-		EndIf
-	EndIf
-	If Not FileGetSize($LoggedUtilityStreamCsvFile) > 100000 Then
-		If (_FileCountLines($LoggedUtilityStreamCsvFile) < 2) Then
-			FileMove($LoggedUtilityStreamCsvFile,$LoggedUtilityStreamCsvFile&".empty",1)
-			_DebugOut("Empty output: " & $LoggedUtilityStreamCsvFile & " is postfixed with .empty")
-		EndIf
-	EndIf
-	If Not FileGetSize($LoggedUtilityStreamTxfDataCsvFile) > 100000 Then
-		If (_FileCountLines($LoggedUtilityStreamTxfDataCsvFile) < 2) Then
-			FileMove($LoggedUtilityStreamTxfDataCsvFile,$LoggedUtilityStreamTxfDataCsvFile&".empty",1)
-			_DebugOut("Empty output: " & $LoggedUtilityStreamTxfDataCsvFile & " is postfixed with .empty")
-		EndIf
-	EndIf
-	If Not FileGetSize($AdditionalDataCsvFile) > 100000 Then
-		If (_FileCountLines($AdditionalDataCsvFile) < 2) Then
-			FileMove($AdditionalDataCsvFile,$AdditionalDataCsvFile&".empty",1)
-			_DebugOut("Empty output: " & $AdditionalDataCsvFile & " is postfixed with .empty")
-		EndIf
-	EndIf
+	Next
 
 	_DisplayWrapper("Finished processing " & $Total & " records" & @CRLF)
 
@@ -2768,7 +2727,7 @@ Func _Get_ObjectID($MFTEntry,$OBJECTID_Offset,$OBJECTID_Size)
 			_DebugOut("Error: The $OBJECT_ID size (" & $OBJECTID_Size - 24 & ") was unexpected.", "0x" & StringMid($MFTEntry,$OBJECTID_Offset))
 	EndSelect
 	;Write the decoded guid info to a separate file
-	FileWriteLine($EntriesObjectIdCsvFile, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $GUID_ObjectID & $de & $GUID_ObjectID_Version & $de & $GUID_ObjectID_Timestamp & $de & $GUID_ObjectID_TimestampDec & $de & $GUID_ObjectID_ClockSeq & $de & $GUID_ObjectID_Node & $de & $GUID_BirthVolumeID & $de & $GUID_BirthVolumeID_Version & $de & $GUID_BirthVolumeID_Timestamp & $de & $GUID_BirthVolumeID_TimestampDec & $de & $GUID_BirthVolumeID_ClockSeq & $de & $GUID_BirthVolumeID_Node & $de & $GUID_BirthObjectID & $de & $GUID_BirthObjectID_Version & $de & $GUID_BirthObjectID_Timestamp & $de & $GUID_BirthObjectID_TimestampDec & $de & $GUID_BirthObjectID_ClockSeq & $de & $GUID_BirthObjectID_Node & $de & $GUID_DomainID & $de & $GUID_DomainID_Version & $de & $GUID_DomainID_Timestamp & $de & $GUID_DomainID_TimestampDec & $de & $GUID_DomainID_ClockSeq & $de & $GUID_DomainID_Node & @crlf)
+	FileWriteLine($EntriesObjectIdCsv, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $GUID_ObjectID & $de & $GUID_ObjectID_Version & $de & $GUID_ObjectID_Timestamp & $de & $GUID_ObjectID_TimestampDec & $de & $GUID_ObjectID_ClockSeq & $de & $GUID_ObjectID_Node & $de & $GUID_BirthVolumeID & $de & $GUID_BirthVolumeID_Version & $de & $GUID_BirthVolumeID_Timestamp & $de & $GUID_BirthVolumeID_TimestampDec & $de & $GUID_BirthVolumeID_ClockSeq & $de & $GUID_BirthVolumeID_Node & $de & $GUID_BirthObjectID & $de & $GUID_BirthObjectID_Version & $de & $GUID_BirthObjectID_Timestamp & $de & $GUID_BirthObjectID_TimestampDec & $de & $GUID_BirthObjectID_ClockSeq & $de & $GUID_BirthObjectID_Node & $de & $GUID_DomainID & $de & $GUID_DomainID_Version & $de & $GUID_DomainID_Timestamp & $de & $GUID_DomainID_TimestampDec & $de & $GUID_DomainID_ClockSeq & $de & $GUID_DomainID_Node & @crlf)
 EndFunc
 
 Func _HexToGuidStr($input,$mode)
@@ -2937,7 +2896,7 @@ EndFunc   ;==>_Get_Data
 
 Func _WriteCSVHeaderAdditionalData()
 	$CsvHeader = "Offset"&$de&"MftRef"&$de&"MftSeqNo"&$de&"data_number"&$de&"Name"&$de&"Flags"&$de&"NonResidentFlag"&$de&"LengthOfAttribute"&$de&"IndexedFlag"&$de&"CompressionUnitSize"&$de&"AllocatedSize"&$de&"RealSize"&$de&"InitializedStreamSize"&$de&"StartVCN"&$de&"LastVCN"&$de&"VCNs"&$de&"DataRun"
-	FileWriteLine($AdditionalDataCsvFile, $CsvHeader & @CRLF)
+	FileWriteLine($AdditionalDataCsv, $CsvHeader & @CRLF)
 EndFunc
 
 Func _Get_AdditionalData($MFTEntry, $lDT_Offset, $lDT_Size, $lDT_Number)
@@ -2991,7 +2950,7 @@ Func _Get_AdditionalData($MFTEntry, $lDT_Offset, $lDT_Size, $lDT_Number)
 		$lDT_IndexedFlag = Dec(StringMid($MFTEntry, $lDT_Offset + 44, 2))
 	EndIf
 	;$RecordOffset+$lDT_Offset
-	FileWriteLine($AdditionalDataCsvFile, $RecordOffset & $de & $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $lDT_Number & $de & $lDT_Name & $de & $lDT_Flags & $de & $lDT_NonResidentFlag & $de & $lDT_LengthOfAttribute & $de &  _
+	FileWriteLine($AdditionalDataCsv, $RecordOffset & $de & $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $lDT_Number & $de & $lDT_Name & $de & $lDT_Flags & $de & $lDT_NonResidentFlag & $de & $lDT_LengthOfAttribute & $de &  _
 		$lDT_IndexedFlag & $de & $lDT_ComprUnitSize & $de & $lDT_AllocSize & $de & $lDT_RealSize & $de & $lDT_InitStreamSize & $de & $lDT_StartVCN & $de & $lDT_LastVCN & $de & $lDT_VCNs & $de & $lDT_DataRun & @crlf)
 EndFunc
 
@@ -3345,7 +3304,7 @@ Func _WriteCSV2withQuotes()
 EndFunc
 
 Func _WriteCSVExtra()
-	FileWriteLine($csvextra, $HDR_MFTREcordNumber & $de & $SI_CTime_Core & $de & $SI_CTime_Precision & $de & $SI_ATime_Core & $de & $SI_ATime_Precision & $de & $SI_MTime_Core & $de & $SI_MTime_Precision & $de & $SI_RTime_Core & $de & $SI_RTime_Precision & $de & _
+	FileWriteLine($csvExtra, $HDR_MFTREcordNumber & $de & $SI_CTime_Core & $de & $SI_CTime_Precision & $de & $SI_ATime_Core & $de & $SI_ATime_Precision & $de & $SI_MTime_Core & $de & $SI_MTime_Precision & $de & $SI_RTime_Core & $de & $SI_RTime_Precision & $de & _
 	$FN_CTime_Core & $de & $FN_CTime_Precision & $de & $FN_ATime_Core & $de & $FN_ATime_Precision & $de & $FN_MTime_Core & $de & $FN_MTime_Precision & $de & $FN_RTime_Core & $de & $FN_RTime_Precision & $de & _
 	$FN_CTime_2_Core & $de & $FN_CTime_2_Precision & $de & $FN_ATime_2_Core & $de & $FN_ATime_2_Precision & $de & $FN_MTime_2_Core & $de & $FN_MTime_2_Precision & $de & $FN_RTime_2_Core & $de & $FN_RTime_2_Precision & $de & _
 	$FN_CTime_3_Core & $de & $FN_CTime_3_Precision & $de & $FN_ATime_3_Core & $de & $FN_ATime_3_Precision & $de & $FN_MTime_3_Core & $de & $FN_MTime_3_Precision & $de & $FN_RTime_3_Core & $de & $FN_RTime_3_Precision & @CRLF)
@@ -3362,7 +3321,7 @@ Func _WriteCSV()
 EndFunc
 
 Func _WriteCSVExtraWithQuotes()
-	FileWriteLine($csvextra, $HDR_MFTREcordNumber&'"'&$de&'"'&$SI_CTime_Core&'"'&$de&'"'&$SI_CTime_Precision&'"'&$de&'"'&$SI_ATime_Core&'"'&$de&'"'&$SI_ATime_Precision&'"'&$de&'"'&$SI_MTime_Core&'"'&$de&'"'&$SI_MTime_Precision&'"'&$de&'"'&$SI_RTime_Core&'"'&$de&'"'&$SI_RTime_Precision&'"'&$de&'"'& _
+	FileWriteLine($csvExtra, $HDR_MFTREcordNumber&'"'&$de&'"'&$SI_CTime_Core&'"'&$de&'"'&$SI_CTime_Precision&'"'&$de&'"'&$SI_ATime_Core&'"'&$de&'"'&$SI_ATime_Precision&'"'&$de&'"'&$SI_MTime_Core&'"'&$de&'"'&$SI_MTime_Precision&'"'&$de&'"'&$SI_RTime_Core&'"'&$de&'"'&$SI_RTime_Precision&'"'&$de&'"'& _
 	$FN_CTime_Core&'"'&$de&'"'&$FN_CTime_Precision&'"'&$de&'"'&$FN_ATime_Core&'"'&$de&'"'&$FN_ATime_Precision&'"'&$de&'"'&$FN_MTime_Core&'"'&$de&'"'&$FN_MTime_Precision&'"'&$de&'"'&$FN_RTime_Core&'"'&$de&'"'&$FN_RTime_Precision&'"'&$de&'"'& _
 	$FN_CTime_2_Core&'"'&$de&'"'&$FN_CTime_2_Precision&'"'&$de&'"'&$FN_ATime_2_Core&'"'&$de&'"'&$FN_ATime_2_Precision&'"'&$de&'"'&$FN_MTime_2_Core&'"'&$de&'"'&$FN_MTime_2_Precision&'"'&$de&'"'&$FN_RTime_2_Core&'"'&$de&'"'&$FN_RTime_2_Precision&'"'&$de&'"'& _
 	$FN_CTime_3_Core&'"'&$de&'"'&$FN_CTime_3_Precision&'"'&$de&'"'&$FN_ATime_3_Core&'"'&$de&'"'&$FN_ATime_3_Precision&'"'&$de&'"'&$FN_MTime_3_Core&'"'&$de&'"'&$FN_MTime_3_Precision&'"'&$de&'"'&$FN_RTime_3_Core&'"'&$de&'"'&$FN_RTime_3_Precision&'"'&@CRLF)
@@ -3403,7 +3362,7 @@ Func _WriteCSVExtraHeader()
 	$csv_extra_header &= "FN_CTime_Core"&$de&"FN_CTime_Precision"&$de&"FN_ATime_Core"&$de&"FN_ATime_Precision"&$de&"FN_MTime_Core"&$de&"FN_MTime_Precision"&$de&"FN_RTime_Core"&$de&"FN_RTime_Precision"&$de
 	$csv_extra_header &= "FN_CTime_2_Core"&$de&"FN_CTime_2_Precision"&$de&"FN_ATime_2_Core"&$de&"FN_ATime_2_Precision"&$de&"FN_MTime_2_Core"&$de&"FN_MTime_2_Precision"&$de&"FN_RTime_2_Core"&$de&"FN_RTime_2_Precision"&$de
 	$csv_extra_header &= "FN_CTime_3_Core"&$de&"FN_CTime_3_Precision"&$de&"FN_ATime_3_Core"&$de&"FN_ATime_3_Precision"&$de&"FN_MTime_3_Core"&$de&"FN_MTime_3_Precision"&$de&"FN_RTime_3_Core"&$de&"FN_RTime_3_Precision"
-	FileWriteLine($csvextra, $csv_extra_header & @CRLF)
+	FileWriteLine($csvExtra, $csv_extra_header & @CRLF)
 EndFunc
 
 Func _InjectTimeZoneInfo()
@@ -4096,7 +4055,7 @@ Func _DecodeAppExecLink($sHex)
 	$pData = DllStructCreate("wchar[" & (DllStructGetSize($pBase) - $ptr) / 2 & "]", DllStructGetPtr($pBase) + $ptr)
 	Local $applicationType = DllStructGetData($pData, 1)
 ;	ConsoleWrite("$applicationType: " & $applicationType & @crlf)
-	FileWriteLine($ReparsePointAppExecLinkCsvFile, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $version & $de & $packageId & $de & $entryPoint & $de & $executable & $de & $applicationType & @CRLF)
+	FileWriteLine($ReparsePointAppExecLinkCsv, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $version & $de & $packageId & $de & $entryPoint & $de & $executable & $de & $applicationType & @CRLF)
 	Return $executable
 EndFunc
 
@@ -4184,7 +4143,7 @@ Func _Get_ReparsePoint($Entry,$LocalAttributeOffset,$LocalAttributeSize)
 		EndIf
 		$ReparseData = ""
 	EndIf
-	FileWriteLine($ReparsePointCsvFile, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $ReparseType & $de & $ReparseGuid & $de & $ReparseData & $de & $ReparseSubstituteName & $de & $ReparsePrintName & @CRLF)
+	FileWriteLine($ReparsePointCsv, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $ReparseType & $de & $ReparseGuid & $de & $ReparseData & $de & $ReparseSubstituteName & $de & $ReparsePrintName & @CRLF)
 EndFunc
 
 Func _DecodeCiCataloghint($EaValue)
@@ -4225,7 +4184,7 @@ Func _Get_Ea($Entry,$LocalAttributeOffset,$LocalAttributeSize)
 	;ConsoleWrite("$EaValue:" & @crlf)
 	;ConsoleWrite(_HexEncode("0x"&$EaValue) & @crlf)
 
-	FileWriteLine($EaCsvFile, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $EaCounter & $de & $EaFlags & $de & $EaName & $de & $EaValueLength & $de & $EaValue & @CRLF)
+	FileWriteLine($EaCsv, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $EaCounter & $de & $EaFlags & $de & $EaName & $de & $EaValueLength & $de & $EaValue & @CRLF)
 
 	If $OffsetToNextEa*2 >= $StringLengthInput Then
 		Return
@@ -4255,7 +4214,7 @@ Func _Get_Ea($Entry,$LocalAttributeOffset,$LocalAttributeSize)
 		;ConsoleWrite("$EaValue: " & @crlf)
 		;ConsoleWrite(_HexEncode("0x"&$EaValue) & @crlf)
 
-		FileWriteLine($EaCsvFile, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $EaCounter & $de & $EaFlags & $de & $EaName & $de & $EaValueLength & $de & $EaValue & @CRLF)
+		FileWriteLine($EaCsv, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $EaCounter & $de & $EaFlags & $de & $EaName & $de & $EaValueLength & $de & $EaValue & @CRLF)
 
 	Until $LocalAttributeOffset >= $StringLengthInput
 EndFunc
@@ -4270,7 +4229,7 @@ Func _Get_LoggedUtilityStream($Entry,$CurrentAttributeName)
 	;ConsoleWrite("_Get_LoggedUtilityStream():" & @CRLF)
 	;ConsoleWrite("$TheLoggedUtilityStream = " & $TheLoggedUtilityStream & @crlf)
 
-	FileWriteLine($LoggedUtilityStreamCsvFile, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $CurrentAttributeName & $de & BinaryLen("0x"&$TheLoggedUtilityStream) & @CRLF)
+	FileWriteLine($LoggedUtilityStreamCsv, $HDR_MFTREcordNumber & $de & $HDR_SequenceNo & $de & $CurrentAttributeName & $de & BinaryLen("0x"&$TheLoggedUtilityStream) & @CRLF)
 
 	If $TheLoggedUtilityStream <> "" And $CurrentAttributeName = "$TXF_DATA" Then
 		_Decode_TXF_DATA($TheLoggedUtilityStream)
@@ -4354,7 +4313,7 @@ Func _Decode_TXF_DATA($InputData)
 	;ConsoleWrite("$LsnNtfsMetadata: " & $LsnNtfsMetadata & @CRLF)
 	;ConsoleWrite("$LsnDirectoryIndex: " & $LsnDirectoryIndex & @CRLF)
 
-	FileWriteLine($LoggedUtilityStreamTxfDataCsvFile, $HDR_MFTREcordNumber&$de&$HDR_SequenceNo&$de&$MftRef_RM_Root&$de&$MftRefSeqNo_RM_Root&$de&$UsnIndex&$de&$TxfFileId&$de&$LsnUserData&$de&$LsnNtfsMetadata&$de&$LsnDirectoryIndex&$de&$UnknownFlag)
+	FileWriteLine($LoggedUtilityStreamTxfDataCsv, $HDR_MFTREcordNumber&$de&$HDR_SequenceNo&$de&$MftRef_RM_Root&$de&$MftRefSeqNo_RM_Root&$de&$UsnIndex&$de&$TxfFileId&$de&$LsnUserData&$de&$LsnNtfsMetadata&$de&$LsnDirectoryIndex&$de&$UnknownFlag)
 
 EndFunc
 
@@ -4901,48 +4860,48 @@ EndFunc
 ; ---- Create output --------
 
 Func _WriteCSVHeaderRBI()
-	$RBI_Csv_Header = "Offset"&$de&"MftRecordNumber"&$de&"FileName"&$de&"FileSize"&$de&"Timestamp"&$de&"TextInformation"
-	FileWriteLine($RBICsv, $RBI_Csv_Header & @CRLF)
+	Local $CsvHeader = "Offset"&$de&"MftRecordNumber"&$de&"FileName"&$de&"FileSize"&$de&"Timestamp"&$de&"TextInformation"
+	FileWriteLine($RBICsv, $CsvHeader & @CRLF)
 EndFunc
 
 Func _WriteCSVHeaderI30Entries()
-	$I30_Csv_Header = "Offset"&$de&"MftRecordNumber"&$de&"FileName"&$de&"MFTReference"&$de&"MFTReferenceSeqNo"&$de&"IndexFlags"&$de&"MFTParentReference"&$de&"MFTParentReferenceSeqNo"&$de&"CTime"&$de&"ATime"&$de&"MTime"&$de&"RTime"&$de&"AllocSize"&$de&"RealSize"&$de&"FileFlags"&$de&"ReparseTag"&$de&"NameSpace"&$de&"TextInformation"
-	FileWriteLine($I30EntriesCsv, $I30_Csv_Header & @CRLF)
+	Local $CsvHeader = "Offset"&$de&"MftRecordNumber"&$de&"FileName"&$de&"MFTReference"&$de&"MFTReferenceSeqNo"&$de&"IndexFlags"&$de&"MFTParentReference"&$de&"MFTParentReferenceSeqNo"&$de&"CTime"&$de&"ATime"&$de&"MTime"&$de&"RTime"&$de&"AllocSize"&$de&"RealSize"&$de&"FileFlags"&$de&"ReparseTag"&$de&"NameSpace"&$de&"TextInformation"
+	FileWriteLine($I30EntriesCsv, $CsvHeader & @CRLF)
 EndFunc
 
 Func _WriteObjectIdCsvHeader()
 	Local $CsvHeader = "MftRef"&$de&"MftRefSeqNo"&$de&"ObjectId"&$de&"ObjectId_Version"&$de&"ObjectId_Timestamp"&$de&"ObjectId_TimestampDec"&$de&"ObjectId_ClockSeq"&$de&"ObjectId_Node"&$de&"BirthVolumeId"&$de&"BirthVolumeId_Version"&$de&"BirthVolumeId_Timestamp"&$de&"BirthVolumeId_TimestampDec"&$de&"BirthVolumeId_ClockSeq"&$de&"BirthVolumeId_Node"&$de&"BirthObjectId"&$de&"BirthObjectId_Version"&$de&"BirthObjectId_Timestamp"&$de&"BirthObjectId_TimestampDec"&$de&"BirthObjectId_ClockSeq"&$de&"BirthObjectId_Node"&$de&"DomainId"&$de&"DomainId_Version"&$de&"DomainId_Timestamp"&$de&"DomainId_TimestampDec"&$de&"DomainId_ClockSeq"&$de&"DomainId_Node"
-	FileWriteLine($EntriesObjectIdCsvFile, $CsvHeader & @CRLF)
+	FileWriteLine($EntriesObjectIdCsv, $CsvHeader & @CRLF)
 EndFunc
 
 Func _WriteReparsePointCsvHeader()
 	Local $CsvHeader = "MftRef"&$de&"MftRefSeqNo"&$de&"ReparseType"&$de&"ReparseGuid"&$de&"ReparseData"&$de&"ReparseSubstititeName"&$de&"ReparsePrintName"
-	FileWriteLine($ReparsePointCsvFile, $CsvHeader & @CRLF)
+	FileWriteLine($ReparsePointCsv, $CsvHeader & @CRLF)
 EndFunc
 
 Func _WriteReparsePointAppExecLinkCsvHeader()
 	Local $CsvHeader = "MftRef"&$de&"MftRefSeqNo"&$de&"Version"&$de&"PackageId"&$de&"EntryPoint"&$de&"Executable"&$de&"ApplicationType"
-	FileWriteLine($ReparsePointAppExecLinkCsvFile, $CsvHeader & @CRLF)
+	FileWriteLine($ReparsePointAppExecLinkCsv, $CsvHeader & @CRLF)
 EndFunc
 
 Func _WriteEaCsvHeader()
-	$Ea_Csv_Header = "MftRef"&$de&"MftRefSeqNo"&$de&"Counter"&$de&"EaFlags"&$de&"EaName"&$de&"EaValueLength"&$de&"EaValue"
-	FileWriteLine($EaCsvFile, $Ea_Csv_Header & @CRLF)
+	Local $CsvHeader = "MftRef"&$de&"MftRefSeqNo"&$de&"Counter"&$de&"EaFlags"&$de&"EaName"&$de&"EaValueLength"&$de&"EaValue"
+	FileWriteLine($EaCsv, $CsvHeader & @CRLF)
 EndFunc
 
 Func _WriteTxfDataCsvHeader()
-	$TxfData_Csv_Header = "MftRef"&$de&"MftRefSeqNo"&$de&"MftRef_RM_Root"&$de&"MftRefSeqNo_RM_Root"&$de&"UsnIndex"&$de&"TxfFileId"&$de&"LsnUserData"&$de&"LsnNtfsMetadata"&$de&"LsnDirectoryIndex"&$de&"UnknownFlag"
-	FileWriteLine($LoggedUtilityStreamTxfDataCsvFile, $TxfData_Csv_Header & @CRLF)
+	Local $CsvHeader = "MftRef"&$de&"MftRefSeqNo"&$de&"MftRef_RM_Root"&$de&"MftRefSeqNo_RM_Root"&$de&"UsnIndex"&$de&"TxfFileId"&$de&"LsnUserData"&$de&"LsnNtfsMetadata"&$de&"LsnDirectoryIndex"&$de&"UnknownFlag"
+	FileWriteLine($LoggedUtilityStreamTxfDataCsv, $CsvHeader & @CRLF)
 EndFunc
 
 Func _WriteLoggedUtilityStreamCsvHeader()
-	$LoggedUtilityStream_Csv_Header = "MftRef"&$de&"MftRefSeqNo"&$de&"StreamName"&$de&"StreamSize"
-	FileWriteLine($LoggedUtilityStreamCsvFile, $LoggedUtilityStream_Csv_Header & @CRLF)
+	Local $CsvHeader = "MftRef"&$de&"MftRefSeqNo"&$de&"StreamName"&$de&"StreamSize"
+	FileWriteLine($LoggedUtilityStreamCsv, $CsvHeader & @CRLF)
 EndFunc
 
 Func _WriteCSVHeaderIndxEntries()
-	$Indx_Csv_Header = "Offset"&$de&"FromSlack"&$de&"FileName"&$de&"MFTReference"&$de&"MFTReferenceSeqNo"&$de&"IndexFlags"&$de&"MFTParentReference"&$de&"MFTParentReferenceSeqNo"&$de&"CTime"&$de&"ATime"&$de&"MTime"&$de&"RTime"&$de&"AllocSize"&$de&"RealSize"&$de&"FileFlags"&$de&"ReparseTag"&$de&"EaSize"&$de&"NameSpace"&$de&"CorruptEntries"
-	FileWriteLine($NewI30EntriesCsv, $Indx_Csv_Header & @CRLF)
+	Local $CsvHeader = "Offset"&$de&"FromSlack"&$de&"FileName"&$de&"MFTReference"&$de&"MFTReferenceSeqNo"&$de&"IndexFlags"&$de&"MFTParentReference"&$de&"MFTParentReferenceSeqNo"&$de&"CTime"&$de&"ATime"&$de&"MTime"&$de&"RTime"&$de&"AllocSize"&$de&"RealSize"&$de&"FileFlags"&$de&"ReparseTag"&$de&"EaSize"&$de&"NameSpace"&$de&"CorruptEntries"
+	FileWriteLine($NewI30EntriesCsv, $CsvHeader & @CRLF)
 EndFunc
 
 Func _CreateOutputStructureAndFiles()
@@ -4957,27 +4916,38 @@ Func _CreateOutputStructureAndFiles()
 		Exit
 	EndIf
 
-	$logfile = FileOpen($OutputPath & "\Mft_" & $TimestampStart & ".log",2+32)
+	Local $sLogfile = $OutputPath & "\Mft.log"
+	$logfile = FileOpen($sLogfile, 2+32)
 	If @error Then
-		ConsoleWrite("Error opening: " & $OutputPath & "\Mft_" & $TimestampStart & ".log" & @CRLF)
-		MsgBox(0, "Error", "Error opening: " & $OutputPath & "\Mft_" & $TimestampStart & ".log")
+		ConsoleWrite("Error opening: " & $sLogfile & @CRLF)
+		MsgBox(0, "Error", "Error opening: " & $sLogfile)
 		Exit(1)
 	EndIf
 	_DebugOut("Operation started: " & $TimestampStart)
 
-	$csvfile = $OutputPath & "\Mft_" & $TimestampStart & ".csv"
-	$csv = FileOpen($csvfile, $EncodingWhenOpen)
+	$csvFile = $OutputPath & "\Mft.csv"
+	$csv = FileOpen($csvFile, $EncodingWhenOpen)
 	If @error Then
-		ConsoleWrite("Error opening: " & $csvfile & @CRLF)
-		MsgBox(0, "Error", "Error opening: " & $csvfile)
+		ConsoleWrite("Error opening: " & $csvFile & @CRLF)
+		MsgBox(0, "Error", "Error opening: " & $csvFile)
 		Exit(1)
 	EndIf
 	_WriteCSVHeader()
+	_ArrayAdd($aFileNameAndHandle, $csvFile & "|" & $csv)
 
-	$csvextra = $OutputPath & "\MftExtra_" & $TimestampStart & ".csv"
-	If $DoSplitCsv Then _WriteCSVExtraHeader()
+	$csvExtraFile = $OutputPath & "\MftExtra.csv"
+	If $DoSplitCsv Then
+		$csvExtra = FileOpen($csvExtraFile, $EncodingWhenOpen)
+		If @error Then
+			ConsoleWrite("Error opening: " & $csvExtraFile & @CRLF)
+			MsgBox(0, "Error", "Error opening: " & $csvExtraFile)
+			Exit(1)
+		EndIf
+		_WriteCSVExtraHeader()
+		_ArrayAdd($aFileNameAndHandle, $csvExtraFile & "|" & $csvExtra)
+	EndIf
 
-	$I30EntriesCsvFile = $OutputPath & "\Mft-Slack-I30-Entries_" & $TimestampStart & ".csv"
+	$I30EntriesCsvFile = $OutputPath & "\Mft-Slack-I30-Entries.csv"
 	$I30EntriesCsv = FileOpen($I30EntriesCsvFile, $EncodingWhenOpen)
 	If @error Then
 		ConsoleWrite("Error opening: " & $I30EntriesCsvFile & @CRLF)
@@ -4985,8 +4955,9 @@ Func _CreateOutputStructureAndFiles()
 		Exit(1)
 	EndIf
 	_WriteCSVHeaderI30Entries()
+	_ArrayAdd($aFileNameAndHandle, $I30EntriesCsvFile & "|" & $I30EntriesCsv)
 
-	$NewI30EntriesCsvFile = $OutputPath & "\Mft-All-I30-Entries_" & $TimestampStart & ".csv"
+	$NewI30EntriesCsvFile = $OutputPath & "\Mft-All-I30-Entries.csv"
 	$NewI30EntriesCsv = FileOpen($NewI30EntriesCsvFile, $EncodingWhenOpen)
 	If @error Then
 		ConsoleWrite("Error opening: " & $NewI30EntriesCsvFile & @CRLF)
@@ -4994,8 +4965,9 @@ Func _CreateOutputStructureAndFiles()
 		Exit(1)
 	EndIf
 	_WriteCSVHeaderIndxEntries()
+	_ArrayAdd($aFileNameAndHandle, $NewI30EntriesCsvFile & "|" & $NewI30EntriesCsv)
 
-	$RBICsvFile = $OutputPath & "\Mft-Slack-RBI_" & $TimestampStart & ".csv"
+	$RBICsvFile = $OutputPath & "\Mft-Slack-RBI.csv"
 	$RBICsv = FileOpen($RBICsvFile, $EncodingWhenOpen)
 	If @error Then
 		ConsoleWrite("Error opening: " & $RBICsvFile & @CRLF)
@@ -5003,9 +4975,10 @@ Func _CreateOutputStructureAndFiles()
 		Exit(1)
 	EndIf
 	_WriteCSVHeaderRBI()
+	_ArrayAdd($aFileNameAndHandle, $RBICsvFile & "|" & $RBICsv)
 
 	;$OBJECT_ID
-	$EntriesObjectIdCsvFile = $OutputPath & "\Mft-ObjectId-Entries_" & $TimestampStart & ".csv"
+	$EntriesObjectIdCsvFile = $OutputPath & "\Mft-ObjectId-Entries.csv"
 	$EntriesObjectIdCsv = FileOpen($EntriesObjectIdCsvFile, $EncodingWhenOpen)
 	If @error Then
 		ConsoleWrite("Error opening: " & $EntriesObjectIdCsvFile & @CRLF)
@@ -5013,9 +4986,10 @@ Func _CreateOutputStructureAndFiles()
 		Exit(1)
 	EndIf
 	_WriteObjectIdCsvHeader()
+	_ArrayAdd($aFileNameAndHandle, $EntriesObjectIdCsvFile & "|" & $EntriesObjectIdCsv)
 
 	;$REPARSE_POINT
-	$ReparsePointCsvFile = $OutputPath & "\Mft-ReparsePoint-Entries_" & $TimestampStart & ".csv"
+	$ReparsePointCsvFile = $OutputPath & "\Mft-ReparsePoint-Entries.csv"
 	$ReparsePointCsv = FileOpen($ReparsePointCsvFile, $EncodingWhenOpen)
 	If @error Then
 		ConsoleWrite("Error opening: " & $ReparsePointCsvFile & @CRLF)
@@ -5023,9 +4997,10 @@ Func _CreateOutputStructureAndFiles()
 		Exit(1)
 	EndIf
 	_WriteReparsePointCsvHeader()
+	_ArrayAdd($aFileNameAndHandle, $ReparsePointCsvFile & "|" & $ReparsePointCsv)
 
 	;$REPARSE_POINT -> AppExecLink type
-	$ReparsePointAppExecLinkCsvFile = $OutputPath & "\Mft-ReparsePoint-AppExecLink_" & $TimestampStart & ".csv"
+	$ReparsePointAppExecLinkCsvFile = $OutputPath & "\Mft-ReparsePoint-AppExecLink.csv"
 	$ReparsePointAppExecLinkCsv = FileOpen($ReparsePointAppExecLinkCsvFile, $EncodingWhenOpen)
 	If @error Then
 		ConsoleWrite("Error opening: " & $ReparsePointAppExecLinkCsvFile & @CRLF)
@@ -5033,9 +5008,10 @@ Func _CreateOutputStructureAndFiles()
 		Exit(1)
 	EndIf
 	_WriteReparsePointAppExecLinkCsvHeader()
+	_ArrayAdd($aFileNameAndHandle, $ReparsePointAppExecLinkCsvFile & "|" & $ReparsePointAppExecLinkCsv)
 
 	;$EA
-	$EaCsvFile = $OutputPath & "\Mft-Ea-Entries_" & $TimestampStart & ".csv"
+	$EaCsvFile = $OutputPath & "\Mft-Ea-Entries.csv"
 	$EaCsv = FileOpen($EaCsvFile, $EncodingWhenOpen)
 	If @error Then
 		ConsoleWrite("Error opening: " & $EaCsvFile & @CRLF)
@@ -5043,9 +5019,10 @@ Func _CreateOutputStructureAndFiles()
 		Exit(1)
 	EndIf
 	_WriteEaCsvHeader()
+	_ArrayAdd($aFileNameAndHandle, $EaCsvFile & "|" & $EaCsv)
 
 	;$LOGGED_UTILITY_STREAM
-	$LoggedUtilityStreamCsvFile = $OutputPath & "\Mft-LOGGED_UTILITY_STREAM_" & $TimestampStart & ".csv"
+	$LoggedUtilityStreamCsvFile = $OutputPath & "\Mft-LOGGED_UTILITY_STREAM.csv"
 	$LoggedUtilityStreamCsv = FileOpen($LoggedUtilityStreamCsvFile, $EncodingWhenOpen)
 	If @error Then
 		ConsoleWrite("Error opening: " & $LoggedUtilityStreamCsvFile & @CRLF)
@@ -5053,9 +5030,10 @@ Func _CreateOutputStructureAndFiles()
 		Exit(1)
 	EndIf
 	_WriteLoggedUtilityStreamCsvHeader()
+	_ArrayAdd($aFileNameAndHandle, $LoggedUtilityStreamCsvFile & "|" & $LoggedUtilityStreamCsv)
 
 	;$LOGGED_UTILITY_STREAM:$TXF_DATA
-	$LoggedUtilityStreamTxfDataCsvFile = $OutputPath & "\Mft-TXF_DATA_" & $TimestampStart & ".csv"
+	$LoggedUtilityStreamTxfDataCsvFile = $OutputPath & "\Mft-TXF_DATA.csv"
 	$LoggedUtilityStreamTxfDataCsv = FileOpen($LoggedUtilityStreamTxfDataCsvFile, $EncodingWhenOpen)
 	If @error Then
 		ConsoleWrite("Error opening: " & $LoggedUtilityStreamTxfDataCsvFile & @CRLF)
@@ -5063,9 +5041,10 @@ Func _CreateOutputStructureAndFiles()
 		Exit(1)
 	EndIf
 	_WriteTxfDataCsvHeader()
+	_ArrayAdd($aFileNameAndHandle, $LoggedUtilityStreamTxfDataCsvFile & "|" & $LoggedUtilityStreamTxfDataCsv)
 
 	;$DATA
-	$AdditionalDataCsvFile = $OutputPath & "\Mft-DATA_" & $TimestampStart & ".csv"
+	$AdditionalDataCsvFile = $OutputPath & "\Mft-DATA.csv"
 	$AdditionalDataCsv = FileOpen($AdditionalDataCsvFile, $EncodingWhenOpen)
 	If @error Then
 		ConsoleWrite("Error opening: " & $AdditionalDataCsvFile & @CRLF)
@@ -5073,31 +5052,32 @@ Func _CreateOutputStructureAndFiles()
 		Exit(1)
 	EndIf
 	_WriteCSVHeaderAdditionalData()
+	_ArrayAdd($aFileNameAndHandle, $AdditionalDataCsvFile & "|" & $AdditionalDataCsv)
 
 	; sql stuff
 
-	Local $MftSqlFile = $OutputPath & "\Mft_" & $TimestampStart & ".sql"
+	Local $MftSqlFile = $OutputPath & "\Mft.sql"
 	FileInstall(".\import-sql\import-csv-mft.sql", $MftSqlFile)
-	Local $FixedPath = StringReplace($csvfile, "\", "\\")
+	Local $FixedPath = StringReplace($csvFile, "\", "\\")
 	Sleep(500)
 	_ReplaceStringInFile($MftSqlFile, "__PathToCsv__", $FixedPath)
 	If $CheckUnicode = 1 Then _ReplaceStringInFile($MftSqlFile, "latin1", "utf8")
 
-	Local $MftCarvedI30SqlFile = $OutputPath & "\Mft-Slack-I30-Entries_" & $TimestampStart & ".sql"
+	Local $MftCarvedI30SqlFile = $OutputPath & "\Mft-Slack-I30-Entries.sql"
 	FileInstall(".\import-sql\import-csv-mft-carved-i30.sql", $MftCarvedI30SqlFile)
 	$FixedPath = StringReplace($I30EntriesCsvFile, "\", "\\")
 	Sleep(500)
 	_ReplaceStringInFile($MftCarvedI30SqlFile, "__PathToCsv__", $FixedPath)
 	If $CheckUnicode = 1 Then _ReplaceStringInFile($MftCarvedI30SqlFile, "latin1", "utf8")
 
-	Local $MftAllI30SqlFile = $OutputPath & "\Mft-All-I30-Entries_" & $TimestampStart & ".sql"
+	Local $MftAllI30SqlFile = $OutputPath & "\Mft-All-I30-Entries.sql"
 	FileInstall(".\import-sql\import-csv-mft-I30-all.sql", $MftAllI30SqlFile)
 	$FixedPath = StringReplace($NewI30EntriesCsvFile, "\", "\\")
 	Sleep(500)
 	_ReplaceStringInFile($MftAllI30SqlFile, "__PathToCsv__", $FixedPath)
 	If $CheckUnicode = 1 Then _ReplaceStringInFile($MftAllI30SqlFile, "latin1", "utf8")
 
-	Local $MftObjectIdSqlFile = $OutputPath & "\Mft-ObjectId-Entries_" & $TimestampStart & ".sql"
+	Local $MftObjectIdSqlFile = $OutputPath & "\Mft-ObjectId-Entries.sql"
 	FileInstall(".\import-sql\import-csv-mft-objectid.sql", $MftObjectIdSqlFile)
 	$FixedPath = StringReplace($EntriesObjectIdCsvFile, "\", "\\")
 	Sleep(500)
