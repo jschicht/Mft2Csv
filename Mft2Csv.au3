@@ -8,7 +8,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.45
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.46
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #AutoIt3Wrapper_AU3Check_Parameters=-w 3 -w 5
 #AutoIt3Wrapper_Run_Au3Stripper=y
@@ -26,7 +26,7 @@
 #include <ComboConstants.au3>
 #include <FontConstants.au3>
 
-Global $Progversion = "Mft2Csv 2.0.0.45"
+Global $Progversion = "Mft2Csv 2.0.0.46"
 
 ; parts by Ddan, trancexxx, Ascend4nt & others
 
@@ -85,7 +85,7 @@ Global Const $ATTRIBUTE_END_MARKER = 'FFFFFFFF'
 Global $DateTimeFormat, $ExampleTimestampVal = "01CD74B3150770B8", $TimestampPrecision
 Global $tDelta = _WinTime_GetUTCToLocalFileTimeDelta()
 
-Global $TargetDrive = "", $MFT_Record_Size, $BytesPerCluster, $MFT_Offset, $MFT_Size
+Global $TargetDrive = "", $MFT_Record_Size, $BytesPerCluster, $MFT_Offset, $MFT_Size, $sInput
 Global $FileTree[1], $hDisk, $rBuffer, $NonResidentFlag, $zPath, $sBuffer, $Total, $MFTTree[1]
 Global $ADS_Name, $Reparse = ""
 Global $DT_Clusters, $DT_InitSize, $DataRun, $DT_DataRun
@@ -232,24 +232,29 @@ Else
 			$ImageOffset = Int(StringMid(GUICtrlRead($Combo), 10), 2)
 			_DisplayInfo(@CRLF & "Target is: " & GUICtrlRead($Combo) & @CRLF)
 			_DebugOut("Target image file: " & $TargetImageFile)
+			$sInput = $TargetImageFile
 			$hDisk = _WinAPI_CreateFile("\\.\" & $TargetImageFile, 2, 2, 7)
 		Case $IsMftFile
 			_DebugOut("Target $MFT file: " & $TargetMftFile)
+			$sInput = $TargetMftFile
 			$hDisk = _WinAPI_CreateFile("\\.\" & $TargetMftFile, 2, 2, 7)
 			$MftFileSize = _WinAPI_GetFileSizeEx($hDisk)
 		Case $IsPhysicalDrive = True
 			$ImageOffset = Int(StringMid(GUICtrlRead($Combo), 10), 2)
 			_DebugOut("Target is: \\.\" & $TargetImageFile)
+			$sInput = $TargetImageFile
 			$hDisk = _WinAPI_CreateFile("\\.\" & $TargetImageFile, 2, 2, 6)
 		Case $IsShadowCopy = True
 			$TargetDrive = "SC" & StringMid($TargetImageFile, 47)
 			$ImageOffset = Int(StringMid(GUICtrlRead($Combo), 10), 2)
 			_DebugOut("Target drive is: " & $TargetImageFile)
 			_DebugOut("Volume at offset: " & $ImageOffset)
+			$sInput = $TargetImageFile
 			$hDisk = _WinAPI_CreateFile($TargetImageFile, 2, 2, 6)
 		Case Else
 			$TargetDrive = StringMid(GUICtrlRead($Combo), 1, 2)
 			_DebugOut("Target volume: " & $TargetDrive)
+			$sInput = $TargetDrive
 			$hDisk = _WinAPI_CreateFile("\\.\" & $TargetDrive, 2, 2, 6)
 	EndSelect
 
@@ -380,14 +385,17 @@ Func _ExtractSystemfile()
 			Return SetError(1)
 	EndSelect
 
+	; Create output
+	_CreateOutputStructureAndFiles()
+
+	_DebugOut("Using input: " & $sInput)
+	_DebugOut("Using output format: " & $sOutputFormat)
+
 	If $checkquotes = 1 Then
 		_DebugOut("Writing variables surrounded with qoutes")
 	Else
 		_DebugOut("Writing variables without surrounding qoutes")
 	EndIf
-
-	; Create output
-	;_CreateOutputStructureAndFiles()
 
 	_DebugOut("Timestamps presented in UTC " & $UTCconfig)
 	_DebugOut("Timestamp Precision: " & $TimestampPrecision)
@@ -436,9 +444,6 @@ Func _ExtractSystemfile()
 		$de = $SeparatorInput
 		_DebugOut("Using separator: " & $de)
 	EndIf
-
-	; Create output
-	_CreateOutputStructureAndFiles()
 
 	If (Not $IsImage and Not $IsMftFile and Not $IsShadowCopy) Then
 		If DriveGetFileSystem($TargetDrive) <> "NTFS" Then		;read boot sector and extract $MFT data
@@ -634,6 +639,7 @@ Func _ExtractSystemfile()
 	_WinAPI_CloseHandle($hDisk)
 	AdlibUnRegister()
 	GUIDelete($Progress)
+	_ExtractionProgress()
 
 	; close csv handles
 	For $x = 0 To UBound($aFileNameAndHandle) - 1
@@ -1276,7 +1282,7 @@ Func _FolderStrucProgress()
 EndFunc
 
 Func _ExtractionProgress()
-	GUICtrlSetData($ProgressStatus, "Decoding record " & $CurrentProgress & " of " & $Total & " (step 3 of 3)")
+	GUICtrlSetData($ProgressStatus, "Decoding record " & $CurrentProgress + 1 & " of " & $Total & " (step 3 of 3)")
 	GUICtrlSetData($ElapsedTime, "Elapsed time = " & _WinAPI_StrFromTimeInterval(TimerDiff($begin)))
     GUICtrlSetData($OverallProgress, 100 * $CurrentProgress / $Total)
 	GUICtrlSetData($ProgressFileName, $FN_Name)
@@ -3926,6 +3932,7 @@ Func _GetInputParams()
 			Exit(1)
 		EndIf
 		$IsMftFile = 1
+		$sInput = $TargetMftFile
 		$hDisk = _WinAPI_CreateFile("\\.\" & $TargetMftFile, 2, 2, 2)
 		If $hDisk = 0 Then
 			_DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
@@ -3943,6 +3950,7 @@ Func _GetInputParams()
 			ConsoleWrite("Error input volume in bad format." & @CRLF)
 			Exit(1)
 		EndIf
+		$sInput = $TargetDrive
 		$hDisk = _WinAPI_CreateFile("\\.\" & $TargetDrive, 2, 2, 6)
 		If $hDisk = 0 Then
 			_DebugOut("CreateFile: " & _WinAPI_GetLastErrorMessage())
