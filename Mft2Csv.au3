@@ -8,7 +8,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.46
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.47
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #AutoIt3Wrapper_AU3Check_Parameters=-w 3 -w 5
 #AutoIt3Wrapper_Run_Au3Stripper=y
@@ -26,7 +26,7 @@
 #include <ComboConstants.au3>
 #include <FontConstants.au3>
 
-Global $Progversion = "Mft2Csv 2.0.0.46"
+Global $Progversion = "Mft2Csv 2.0.0.47"
 
 ; parts by Ddan, trancexxx, Ascend4nt & others
 
@@ -413,6 +413,8 @@ Func _ExtractSystemfile()
 	If $checkFixups = 1 Then
 		$SkipFixups = True
 		_DebugOut("Skipping Fixups")
+	Else
+		$SkipFixups = False
 	EndIf
 
 	If $checkBruteForceSlack = 1 Then
@@ -605,12 +607,14 @@ Func _ExtractSystemfile()
 			$Signature = ""
 			ContinueLoop
 		EndIf
+
 		$RecordOffset = "0x" & Hex($RecordOffsetDec)
 		If $ExtractResidentData Then
 			_ExtractSingleFile($MFTEntry, $i)
 		EndIf
 		_ClearVar()
 		$RecordOffset = "0x" & Hex($RecordOffsetDec)
+
 		_ParserCodeOldVersion($MFTEntry)
 		If $DT_Number > 0 Then $ADS = $DT_Number - 1
 		;$RecordOffset = "0x" & Hex($RecordOffsetDec)
@@ -1446,50 +1450,55 @@ Func _ParserCodeOldVersion($MFTEntry)
 	$FN_Number = 0
 	$DT_Number = 0
 	$UpdSeqArrOffset = ""
-	$UpdSeqArrSize = ""
 	$UpdSeqArrOffset = StringMid($MFTEntry, 11, 4)
 	$UpdSeqArrOffset = Dec(_SwapEndian($UpdSeqArrOffset),2)
-	$UpdSeqArrSize = StringMid($MFTEntry, 15, 4)
-	$UpdSeqArrSize = Dec(_SwapEndian($UpdSeqArrSize),2)
-	$UpdSeqArr = StringMid($MFTEntry, 3 + ($UpdSeqArrOffset * 2), $UpdSeqArrSize * 2 * 2)
-	Local $UpdSeqArrPart0, $UpdSeqArrPart1, $UpdSeqArrPart2, $RecordEnd1, $RecordEnd2
 
-	If $MFT_Record_Size = 1024 Then
-		$UpdSeqArrPart0 = StringMid($UpdSeqArr,1,4)
-		$UpdSeqArrPart1 = StringMid($UpdSeqArr,5,4)
-		$UpdSeqArrPart2 = StringMid($UpdSeqArr,9,4)
-		$RecordEnd1 = StringMid($MFTEntry,1023,4)
-		$RecordEnd2 = StringMid($MFTEntry,2047,4)
-		If $RecordEnd1 <> $RecordEnd2 Or $UpdSeqArrPart0 <> $RecordEnd1 Then
-			$IntegrityCheck = "BAD"
-		Else
-			$IntegrityCheck = "OK"
+	If Not $SkipFixups Then
+		$UpdSeqArrSize = ""
+		$UpdSeqArrSize = StringMid($MFTEntry, 15, 4)
+		$UpdSeqArrSize = Dec(_SwapEndian($UpdSeqArrSize),2)
+		$UpdSeqArr = StringMid($MFTEntry, 3 + ($UpdSeqArrOffset * 2), $UpdSeqArrSize * 2 * 2)
+		Local $UpdSeqArrPart0, $UpdSeqArrPart1, $UpdSeqArrPart2, $RecordEnd1, $RecordEnd2
+
+		If $MFT_Record_Size = 1024 Then
+			$UpdSeqArrPart0 = StringMid($UpdSeqArr,1,4)
+			$UpdSeqArrPart1 = StringMid($UpdSeqArr,5,4)
+			$UpdSeqArrPart2 = StringMid($UpdSeqArr,9,4)
+			$RecordEnd1 = StringMid($MFTEntry,1023,4)
+			$RecordEnd2 = StringMid($MFTEntry,2047,4)
+			If $RecordEnd1 <> $RecordEnd2 Or $UpdSeqArrPart0 <> $RecordEnd1 Then
+				$IntegrityCheck = "BAD"
+			Else
+				$IntegrityCheck = "OK"
+			EndIf
+			$MFTEntry = StringMid($MFTEntry,1,1022) & $UpdSeqArrPart1 & StringMid($MFTEntry,1027,1020) & $UpdSeqArrPart2
+		ElseIf $MFT_Record_Size = 4096 Then
+			$UpdSeqArrPart0 = StringMid($UpdSeqArr,1,4)
+			$UpdSeqArrPart1 = StringMid($UpdSeqArr,5,4)
+			$UpdSeqArrPart2 = StringMid($UpdSeqArr,9,4)
+			Local $UpdSeqArrPart3 = StringMid($UpdSeqArr,13,4)
+			Local $UpdSeqArrPart4 = StringMid($UpdSeqArr,17,4)
+			Local $UpdSeqArrPart5 = StringMid($UpdSeqArr,21,4)
+			Local $UpdSeqArrPart6 = StringMid($UpdSeqArr,25,4)
+			Local $UpdSeqArrPart7 = StringMid($UpdSeqArr,29,4)
+			Local $UpdSeqArrPart8 = StringMid($UpdSeqArr,33,4)
+			$RecordEnd1 = StringMid($MFTEntry,1023,4)
+			$RecordEnd2 = StringMid($MFTEntry,2047,4)
+			Local $RecordEnd3 = StringMid($MFTEntry,3071,4)
+			Local $RecordEnd4 = StringMid($MFTEntry,4095,4)
+			Local $RecordEnd5 = StringMid($MFTEntry,5119,4)
+			Local $RecordEnd6 = StringMid($MFTEntry,6143,4)
+			Local $RecordEnd7 = StringMid($MFTEntry,7167,4)
+			Local $RecordEnd8 = StringMid($MFTEntry,8191,4)
+			If $UpdSeqArrPart0 <> $RecordEnd1 OR $UpdSeqArrPart0 <> $RecordEnd2 OR $UpdSeqArrPart0 <> $RecordEnd3 OR $UpdSeqArrPart0 <> $RecordEnd4 OR $UpdSeqArrPart0 <> $RecordEnd5 OR $UpdSeqArrPart0 <> $RecordEnd6 OR $UpdSeqArrPart0 <> $RecordEnd7 OR $UpdSeqArrPart0 <> $RecordEnd8 Then
+				$IntegrityCheck = "BAD"
+			Else
+				$IntegrityCheck = "OK"
+			EndIf
+			$MFTEntry =  StringMid($MFTEntry,1,1022) & $UpdSeqArrPart1 & StringMid($MFTEntry,1027,1020) & $UpdSeqArrPart2 & StringMid($MFTEntry,2051,1020) & $UpdSeqArrPart3 & StringMid($MFTEntry,3075,1020) & $UpdSeqArrPart4 & StringMid($MFTEntry,4099,1020) & $UpdSeqArrPart5 & StringMid($MFTEntry,5123,1020) & $UpdSeqArrPart6 & StringMid($MFTEntry,6147,1020) & $UpdSeqArrPart7 & StringMid($MFTEntry,7171,1020) & $UpdSeqArrPart8
 		EndIf
-		$MFTEntry = StringMid($MFTEntry,1,1022) & $UpdSeqArrPart1 & StringMid($MFTEntry,1027,1020) & $UpdSeqArrPart2
-	ElseIf $MFT_Record_Size = 4096 Then
-		$UpdSeqArrPart0 = StringMid($UpdSeqArr,1,4)
-		$UpdSeqArrPart1 = StringMid($UpdSeqArr,5,4)
-		$UpdSeqArrPart2 = StringMid($UpdSeqArr,9,4)
-		Local $UpdSeqArrPart3 = StringMid($UpdSeqArr,13,4)
-		Local $UpdSeqArrPart4 = StringMid($UpdSeqArr,17,4)
-		Local $UpdSeqArrPart5 = StringMid($UpdSeqArr,21,4)
-		Local $UpdSeqArrPart6 = StringMid($UpdSeqArr,25,4)
-		Local $UpdSeqArrPart7 = StringMid($UpdSeqArr,29,4)
-		Local $UpdSeqArrPart8 = StringMid($UpdSeqArr,33,4)
-		$RecordEnd1 = StringMid($MFTEntry,1023,4)
-		$RecordEnd2 = StringMid($MFTEntry,2047,4)
-		Local $RecordEnd3 = StringMid($MFTEntry,3071,4)
-		Local $RecordEnd4 = StringMid($MFTEntry,4095,4)
-		Local $RecordEnd5 = StringMid($MFTEntry,5119,4)
-		Local $RecordEnd6 = StringMid($MFTEntry,6143,4)
-		Local $RecordEnd7 = StringMid($MFTEntry,7167,4)
-		Local $RecordEnd8 = StringMid($MFTEntry,8191,4)
-		If $UpdSeqArrPart0 <> $RecordEnd1 OR $UpdSeqArrPart0 <> $RecordEnd2 OR $UpdSeqArrPart0 <> $RecordEnd3 OR $UpdSeqArrPart0 <> $RecordEnd4 OR $UpdSeqArrPart0 <> $RecordEnd5 OR $UpdSeqArrPart0 <> $RecordEnd6 OR $UpdSeqArrPart0 <> $RecordEnd7 OR $UpdSeqArrPart0 <> $RecordEnd8 Then
-			$IntegrityCheck = "BAD"
-		Else
-			$IntegrityCheck = "OK"
-		EndIf
-		$MFTEntry =  StringMid($MFTEntry,1,1022) & $UpdSeqArrPart1 & StringMid($MFTEntry,1027,1020) & $UpdSeqArrPart2 & StringMid($MFTEntry,2051,1020) & $UpdSeqArrPart3 & StringMid($MFTEntry,3075,1020) & $UpdSeqArrPart4 & StringMid($MFTEntry,4099,1020) & $UpdSeqArrPart5 & StringMid($MFTEntry,5123,1020) & $UpdSeqArrPart6 & StringMid($MFTEntry,6147,1020) & $UpdSeqArrPart7 & StringMid($MFTEntry,7171,1020) & $UpdSeqArrPart8
+	Else
+		$IntegrityCheck = "BAD"
 	EndIf
 
 	$HDR_LSN = StringMid($MFTEntry, 19, 16)
@@ -3216,6 +3225,7 @@ Func _File_Attributes($FAInput)
 	If BitAND($FAInput, 0x80000) Then $FAOutput &= 'pinned+'
 	If BitAND($FAInput, 0x100000) Then $FAOutput &= 'unpinned+'
 	If BitAND($FAInput, 0x400000) Then $FAOutput &= 'recall_on_data_access+'
+	If BitAND($FAInput, 0x10000000) Then $FAOutput &= 'directory+'
 	If BitAND($FAInput, 0x20000000) Then $FAOutput &= 'index_view+' ; strictly_sequencial?
 	$FAOutput = StringTrimRight($FAOutput, 1)
 	Return $FAOutput

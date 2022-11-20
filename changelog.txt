@@ -1,5 +1,9 @@
 Mft2Csv changelog
 
+v2.0.0.47
+Fixed bug relating to the skipfixup feature.
+Added missing mask for directory on file permission decode. 
+
 v2.0.0.46
 Fixed minor bug where chosen configuration was not written to the log file.
 Fixed minor visual issue where progress bar was not completed at end of parsing.
