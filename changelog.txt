@@ -1,5 +1,10 @@
 Mft2Csv changelog
 
+v2.0.0.48
+Fized bug with two uninitialized variables in command line mode.
+Fixed a bug with resolved path for deleted items.
+Fixed a bug that in some cases caused FilePaths for hard links to be incomplete.
+
 v2.0.0.47
 Fixed bug relating to the skipfixup feature.
 Added missing mask for directory on file permission decode. 

@@ -8,7 +8,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.47
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.48
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #AutoIt3Wrapper_AU3Check_Parameters=-w 3 -w 5
 #AutoIt3Wrapper_Run_Au3Stripper=y
@@ -26,7 +26,7 @@
 #include <ComboConstants.au3>
 #include <FontConstants.au3>
 
-Global $Progversion = "Mft2Csv 2.0.0.47"
+Global $Progversion = "Mft2Csv 2.0.0.48"
 
 ; parts by Ddan, trancexxx, Ascend4nt & others
 
@@ -86,20 +86,21 @@ Global $DateTimeFormat, $ExampleTimestampVal = "01CD74B3150770B8", $TimestampPre
 Global $tDelta = _WinTime_GetUTCToLocalFileTimeDelta()
 
 Global $TargetDrive = "", $MFT_Record_Size, $BytesPerCluster, $MFT_Offset, $MFT_Size, $sInput
-Global $FileTree[1], $hDisk, $rBuffer, $NonResidentFlag, $zPath, $sBuffer, $Total, $MFTTree[1]
+Global $FileTree[1][4], $hDisk, $rBuffer, $NonResidentFlag, $zPath, $sBuffer, $Total, $MFTTree[1]
 Global $ADS_Name, $Reparse = ""
 Global $DT_Clusters, $DT_InitSize, $DataRun, $DT_DataRun
 Global $IsCompressed, $IsSparse, $logfile = 0, $subst, $active = False
 Global $RUN_VCN[1], $RUN_Clusters[1], $MFT_RUN_Clusters[1], $MFT_RUN_VCN[1], $DataQ[1], $AttrQ[1]
 Global $TargetImageFile, $Entries, $IsImage = False, $ImageOffset=0, $IsMftFile=False, $TargetMftFile
 Global $begin, $ElapsedTime, $InitState=1
-Global $OverallProgress, $CurrentProgress=-1, $ProgressStatus, $ProgressFileName, $ProgressSize ;$FileProgress
+Global $OverallProgress, $CurrentProgress=-1, $ProgressStatus, $ProgressFileName, $ProgressSize
 Global $RegExPattern = "[1-9a-fA-F]"
 
 Global Const $RecordSignatureBad = '42414144' ; BAAD signature
 Global Const $RecordSignature = '46494C45' ; FILE signature
 
 Global $myctredit, $CheckUnicode, $CheckCsvSplit, $checkFixups, $checkBrokenMFT, $checkBruteForceSlack, $SeparatorInput, $checkquotes, $ComboRecordSize, $sOutputFormat
+Global $checkExtractResidentData, $checkExtractResidentSlack
 Global $CommandlineMode
 Global $buttonColor = 0xD8D8DF
 
@@ -505,7 +506,7 @@ Func _ExtractSystemfile()
 		_DoFileTree()                        ;creates folder structure
 	Else
 		$Total = ($MftFileSize/$MFT_Record_Size)
-		Redim $FileTree[$Total]
+		Redim $FileTree[$Total][4]
 	EndIf
 
 	$ProgressFileName = GUICtrlCreateLabel("", 20,  495, 660, 20, $DT_END_ELLIPSIS)
@@ -517,7 +518,7 @@ Func _ExtractSystemfile()
 
 	For $i = 0 To UBound($FileTree)-1	;note $i is mft reference number
 		$CurrentProgress = $i
-		$Files = $Filetree[$i]
+		$Files = $Filetree[$i][0]
 		If StringInStr($Files, "/") > 0 Then ;MFT record was split across 2 dataruns
 			_DebugOut("Ref " & $i & " has its record split across 2 dataruns")
 			$SplitRecordPart1 = StringMid($Files, StringInStr($Files, "/")+1)
@@ -666,8 +667,9 @@ EndFunc
 
 Func _DoFileTree()
 	Local $nBytes, $ParentRef, $FileRef, $BaseRef, $testvar=0, $TmpRecord, $MFTClustersToKeep=0, $DoKeepCluster=0, $Subtr, $PartOfAttrList=0, $ArrSize
+	Local $FileSeq, $ParentSeq, $active, $BaseSeq
 	$Total = Int($MFT_Size/$MFT_Record_Size)
-	Global $FileTree[$Total]
+	Global $FileTree[$Total][4] ;FilePath, active, refseq, parentrefseq,
 	Global $MFTTree[$Total]
 	$ref = -1
 	$Pos=0
@@ -732,14 +734,22 @@ Func _DoFileTree()
 			$CurrentMFTOffset = DllCall('kernel32.dll', 'int', 'SetFilePointerEx', 'ptr', $hDisk, 'int64', 0, 'int64*', 0, 'dword', 1)
 			$MFTTree[$ref] = $CurrentMFTOffset[3]-$MFT_Record_Size
 			$Flags = Dec(StringMid($record,47,4))
+			If Not BitAND($Flags,Dec("0100")) Then
+				$active = 0
+			Else
+				$active = 1
+			EndIf
 			If Not $SkipFixups Then $record = _DoFixup($record, $ref)
 			If $record = "" then ContinueLoop   ;corrupt, failed fixup
 			$FileRef = $ref
-			$BaseRef = Dec(_SwapEndian(StringMid($record,67,8)),2)
+			$FileSeq = Dec(_SwapEndian(StringMid($record,35,4)))
+			$BaseRef = Dec(_SwapEndian(StringMid($record,67,12)),2)
+			$BaseSeq = Dec(_SwapEndian(StringMid($record,79,4)))
 			If $BaseRef <> 0 Or StringInStr($MftAttrListString,','&$FileRef&',') Then ;The baseRef can be 0 for the extra records when $MFT contains $ATTRIBUTE_LIST
 				_DebugOut("Ref " & $FileRef & " has baseref " & $BaseRef)
-				$FileTree[$FileRef] = $Pos + $i      ;may contain data attribute
+				$FileTree[$FileRef][0] = $Pos + $i      ;may contain data attribute
 				$FileRef = $BaseRef
+				$FileSeq = $BaseSeq
 				$PartOfAttrList=1
 			Else
 				$PartOfAttrList=0
@@ -752,14 +762,15 @@ Func _DoFileTree()
 				$Size = Dec(_SwapEndian(StringMid($record,$Offset+8,8)),2)
 				If $Type = Dec("30000000",2) Then
 					$attr = StringMid($record,$Offset,$Size*2)
-					$ParentRef = Dec(_SwapEndian(StringMid($attr,49,8)),2)
+					$ParentRef = Dec(_SwapEndian(StringMid($attr,49,12)),2)
+					$ParentSeq = Dec(_SwapEndian(StringMid($attr,61,4)))
 					$NameSpace = StringMid($attr,179,2)
-					If $NameSpace <> "02" Then
+					If $NameSpace <> "02" Then ; skip DOS
 						$NameLength = Dec(StringMid($attr,177,2))
 						$FileName = StringMid($attr,181,$NameLength*4)
 						$FileName = BinaryToString("0x"&$FileName,2)
-						If Not BitAND($Flags,Dec("0100")) Then $FileName = "[DEL" & $ref & "]" & $FileName     ;deleted record
-						$FileTree[$FileRef] &= "**" & $ParentRef & "*" & $FileName
+						$FileTree[$FileRef][0] &= "**" & $ParentRef & "*" & $FileName
+						$FileTree[$FileRef][3] &= "**" & $ParentRef & "-" & $ParentSeq
 					EndIf
 				ElseIf $Type = Dec("C0000000",2) Then
 					#cs
@@ -778,28 +789,38 @@ Func _DoFileTree()
 				EndIf
 				$Offset += $Size*2
 			WEnd
-			If Not BitAND($Flags,Dec("0200")) And $PartOfAttrList=0 And $FileTree[$FileRef] <> "" Then $FileTree[$FileRef] &= "?" & ($Pos + $i)     ;file also add FilePointer
-			If StringInStr($FileTree[$FileRef], "**") = 1 Then $FileTree[$FileRef] = StringTrimLeft($FileTree[$FileRef],2)    ;remove leading **
-			If $i = 0 And $DoKeepCluster Then $FileTree[$FileRef] &= "/" & $ArrSize  ;Mark record as being split across 2 runs
+			If Not BitAND($Flags,Dec("0200")) And $PartOfAttrList=0 And $FileTree[$FileRef][0] <> "" Then
+				$FileTree[$FileRef][0] &= "?" & ($Pos + $i)     ;file also add FilePointer
+			EndIf
+			If StringInStr($FileTree[$FileRef][0], "**") = 1 Then $FileTree[$FileRef][0] = StringTrimLeft($FileTree[$FileRef][0],2)    ;remove leading **
+			If StringInStr($FileTree[$FileRef][3], "**") = 1 Then $FileTree[$FileRef][3] = StringTrimLeft($FileTree[$FileRef][3],2)    ;remove leading **
+			If $i = 0 And $DoKeepCluster Then $FileTree[$FileRef][0] &= "/" & $ArrSize  ;Mark record as being split across 2 runs
+			$FileTree[$FileRef][1] = $active
+			If $active = 0 Then $FileSeq -= 1 ; to get correct mapping with deleted items
+			$FileTree[$FileRef][2] = $FileRef & "-" & $FileSeq
+
 		Next
 	Next
 	AdlibUnRegister()
 	If UBound($FileTree) > 5 Then
-		$FileTree[5] = ":"
+		$FileTree[5][0] = ":"
 	EndIf
 	$begin = TimerInit()
-	AdlibRegister("_FolderStrucProgress", 500)
+	AdlibRegister("_FolderStrucProgress", 1000)
+	Local $RefSeq1, $RefSeq2, $RefSeq1s
 	For $i = 0 to UBound($FileTree)-1
 		$CurrentProgress = $i
-		If StringInStr($FileTree[$i], "**") = 0 Then
-			While StringInStr($FileTree[$i], "*") > 0   ;single file
-				$Parent=StringMid($Filetree[$i], 1, StringInStr($FileTree[$i], "*")-1)
-;				_DebugOut("$Parent: " & $Parent)
+		If StringInStr($FileTree[$i][0], "**") = 0 Then
+			$RefSeq1 = $FileTree[$i][3]
+			While StringInStr($FileTree[$i][0], "*") > 0   ;single file
+				$Parent=StringMid($Filetree[$i][0], 1, StringInStr($FileTree[$i][0], "*")-1)
+				$RefSeq2 = $FileTree[$Parent][2]
 				If $Parent < UBound($Filetree) Then
-					If StringInStr($Filetree[$Parent],"?")=0 And (StringInStr($Filetree[$Parent],"*")>0 Or StringInStr($Filetree[$Parent],":")>0) Then
-						$FileTree[$i] = StringReplace($FileTree[$i], $Parent & "*", $Filetree[$Parent] & "\")
+					If StringInStr($Filetree[$Parent][0],"?")=0 And (StringInStr($Filetree[$Parent][0],"*")>0 Or StringInStr($Filetree[$Parent][0],":")>0) And $RefSeq1 = $RefSeq2 Then
+						$FileTree[$i][0] = StringReplace($FileTree[$i][0], $Parent & "*", $Filetree[$Parent][0] & "\")
+						$RefSeq1 = $FileTree[$Parent][3]
 					Else
-						$FileTree[$i] = StringReplace($FileTree[$i], $Parent & "*", $Filetree[5] & "\ORPHAN\")
+						$FileTree[$i][0] = StringReplace($FileTree[$i][0], $Parent & "*", $Filetree[5][0] & "\ORPHAN\")
 					EndIf
 				Else
 					_DebugOut("Error: $Parent out of bounds: " & $Parent)
@@ -807,18 +828,20 @@ Func _DoFileTree()
 				EndIf
 			WEnd
 		Else
-			$Names = StringSplit($FileTree[$i], "**",3)     ;hard links
+			$Names = StringSplit($FileTree[$i][0], "**",3)     ;hard links
 			$str = ""
+			$RefSeq1s = StringSplit($FileTree[$i][3], "**",3)
 			For $n = 0 to UBound($Names) - 1
+				$RefSeq1 = $RefSeq1s[$n]
 				While StringInStr($Names[$n], "*") > 0
-;					_DebugOut("$Names[$n]: " & $Names[$n])
 					$Parent=StringMid($Names[$n], 1, StringInStr($Names[$n], "*")-1)
-;					_DebugOut("$Parent: " & $Parent)
+					$RefSeq2 = $FileTree[$Parent][2]
 					If $Parent < UBound($Filetree) Then
-						If StringInStr($Filetree[$Parent],"?")=0 And (StringInStr($Filetree[$Parent],"*")>0 Or StringInStr($Filetree[$Parent],":")>0) Then
-							$Names[$n] = StringReplace($Names[$n], $Parent & "*", $Filetree[$Parent] & "\")
+						If StringInStr($Filetree[$Parent][0],"?")=0 And (StringInStr($Filetree[$Parent][0],"*")>0 Or StringInStr($Filetree[$Parent][0],":")>0) And $RefSeq1 = $RefSeq2 Then
+							$Names[$n] = StringReplace($Names[$n], $Parent & "*", $Filetree[$Parent][0] & "\")
+							$RefSeq1 = $FileTree[$Parent][3]
 						Else
-							$Names[$n] = StringReplace($Names[$n], $Parent & "*", $Filetree[5] & "\ORPHAN\")
+							$Names[$n] = StringReplace($Names[$n], $Parent & "*", $Filetree[5][0] & "\ORPHAN\")
 						EndIf
 					Else
 						_DebugOut("Error: $Parent out of bounds: " & $Parent)
@@ -827,26 +850,30 @@ Func _DoFileTree()
 				WEnd
 				$str &= $Names[$n] & "*"
 			Next
-			$FileTree[$i] = StringTrimRight($str,1)
+			$FileTree[$i][0] = StringTrimRight($str,1)
 		EndIf
 	Next
 	If UBound($FileTree) > 5 Then
-		$FileTree[5] &= "\"
+		$FileTree[5][0] &= "\"
 	EndIf
 	AdlibUnRegister()
 	For $i = 0 To UBound($FileTree) - 1
-		If StringInStr($FileTree[$i], "*") = 0 Then
+		If StringInStr($FileTree[$i][0], "*") = 0 Then
 			ContinueLoop
 		EndIf
-		$myarr = StringSplit($FileTree[$i], "*")
+		$myarr = StringSplit($FileTree[$i][0], "*")
 		_ArrayDelete($myarr, 0)
 		_ArraySort($myarr, 0)
 		$testvar = ""
 		For $j = 0 To UBound($myarr) - 1
-			$testvar &= $myarr[$j] & "*"
+			If StringInStr($myarr[$j],"?") Then
+				$testvar &= StringMid($myarr[$j], 1,StringInStr($myarr[$j], "?") - 1) & "*"
+			Else
+				$testvar &= $myarr[$j] & "*"
+			EndIf
 		Next
 		;_DebugOut("Sorted: " & $testvar)
-		$FileTree[$i] = StringTrimRight($testvar, 1)
+		$FileTree[$i][0] = StringTrimRight($testvar, 1)
 	Next
 EndFunc
 
@@ -1043,11 +1070,11 @@ Func _DecodeMFTRecord($record, $FileRef)      ;produces DataQ
 				If $AttrQ[0] = "" Then ContinueLoop		;no new records
 				$str = ""
 				For $i = 1 To $AttrQ[0]
-					If Not IsNumber($FileTree[$AttrQ[$i]]) Then
+					If Not IsNumber($FileTree[$AttrQ[$i]][0]) Then
 						_DebugOut($FileRef & " Overwritten extra record (" & $AttrQ[$i] & ")", $record)
 						Return ""
 					EndIf
-					$rec = _GetAttrListMFTRecord($FileTree[$AttrQ[$i]])
+					$rec = _GetAttrListMFTRecord($FileTree[$AttrQ[$i]][0])
 					If StringMid($rec,3,8) <> $RecordSignature Then
 						_DebugOut($FileRef & " Bad signature for extra record", $record)
 						Return ""
@@ -1274,23 +1301,34 @@ EndFunc
 ; end: by trancexxx -------------------------------------
 
 Func _DoFileTreeProgress()
-    GUICtrlSetData($ProgressStatus, "First examination of MFT record " & $CurrentProgress & " of " & $Total & " (step 1 of 3)")
-    GUICtrlSetData($ElapsedTime, "Elapsed time = " & _WinAPI_StrFromTimeInterval(TimerDiff($begin)))
-	GUICtrlSetData($OverallProgress, 100 * $CurrentProgress / $Total)
+	If Not $CommandlineMode Then
+		GUICtrlSetData($ProgressStatus, "First examination of MFT record " & $CurrentProgress & " of " & $Total & " (step 1 of 3)")
+		GUICtrlSetData($ElapsedTime, "Elapsed time = " & _WinAPI_StrFromTimeInterval(TimerDiff($begin)))
+		GUICtrlSetData($OverallProgress, 100 * $CurrentProgress / $Total)
+	Else
+		ConsoleWrite(Round(100 * $CurrentProgress / $Total, 2) & " % (step 1 of 3)" & @CRLF)
+	EndIf
 EndFunc
 
 Func _FolderStrucProgress()
-	GUICtrlSetData($ProgressStatus, "Resolving paths " & $CurrentProgress & " of " & $Total & " (step 2 of 3)")
-	GUICtrlSetData($ElapsedTime, "Elapsed time = " & _WinAPI_StrFromTimeInterval(TimerDiff($begin)))
-    GUICtrlSetData($OverallProgress, 100 * $CurrentProgress / $Total)
+	If Not $CommandlineMode Then
+		GUICtrlSetData($ProgressStatus, "Resolving paths " & $CurrentProgress & " of " & $Total & " (step 2 of 3)")
+		GUICtrlSetData($ElapsedTime, "Elapsed time = " & _WinAPI_StrFromTimeInterval(TimerDiff($begin)))
+		GUICtrlSetData($OverallProgress, 100 * $CurrentProgress / $Total)
+	Else
+		ConsoleWrite(Round(100 * $CurrentProgress / $Total, 2) & " % (step 2 of 3)" & @CRLF)
+	EndIf
 EndFunc
 
 Func _ExtractionProgress()
-	GUICtrlSetData($ProgressStatus, "Decoding record " & $CurrentProgress + 1 & " of " & $Total & " (step 3 of 3)")
-	GUICtrlSetData($ElapsedTime, "Elapsed time = " & _WinAPI_StrFromTimeInterval(TimerDiff($begin)))
-    GUICtrlSetData($OverallProgress, 100 * $CurrentProgress / $Total)
-	GUICtrlSetData($ProgressFileName, $FN_Name)
-	;GUICtrlSetData($FileProgress, 100 * ($DT_RealSize - $ProgressSize) / $DT_RealSize)
+	If Not $CommandlineMode Then
+		GUICtrlSetData($ProgressStatus, "Decoding record " & $CurrentProgress + 1 & " of " & $Total & " (step 3 of 3)")
+		GUICtrlSetData($ElapsedTime, "Elapsed time = " & _WinAPI_StrFromTimeInterval(TimerDiff($begin)))
+		GUICtrlSetData($OverallProgress, 100 * $CurrentProgress / $Total)
+		GUICtrlSetData($ProgressFileName, $FN_Name)
+	Else
+		ConsoleWrite(Round(100 * $CurrentProgress / $Total, 2) & " % (step 3 of 3)" & @CRLF)
+	EndIf
 EndFunc
 
 Func _ProcessImage()
