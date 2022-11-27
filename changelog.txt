@@ -1,5 +1,8 @@
 Mft2Csv changelog
 
+v2.0.0.49
+Changed default configuration of unicode to 1.
+
 v2.0.0.48
 Fized bug with two uninitialized variables in command line mode.
 Fixed a bug with resolved path for deleted items.

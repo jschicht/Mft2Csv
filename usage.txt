@@ -100,7 +100,7 @@ The separator to use in the csv. Default is |
 /QuotationMark:
 Boolean value for surrounding values in csv with quotes. Default is 0. Can be 0 or 1.
 /Unicode:
-Boolean value for decoding unicode strings. Default is 0. Can be 0 or 1.
+Boolean value for decoding unicode strings. Default is 1. Can be 0 or 1.
 /TSFormat:
 An integer from 1 - 6 for specifying the timestamp format. Start the gui to see what they mean. Default is 6.
 /TSPrecision:

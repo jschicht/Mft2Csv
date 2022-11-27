@@ -8,7 +8,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.48
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.49
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #AutoIt3Wrapper_AU3Check_Parameters=-w 3 -w 5
 #AutoIt3Wrapper_Run_Au3Stripper=y
@@ -26,7 +26,7 @@
 #include <ComboConstants.au3>
 #include <FontConstants.au3>
 
-Global $Progversion = "Mft2Csv 2.0.0.48"
+Global $Progversion = "Mft2Csv 2.0.0.49"
 
 ; parts by Ddan, trancexxx, Ascend4nt & others
 
@@ -168,7 +168,7 @@ Else
 	$checkquotes = GUICtrlCreateCheckbox("Quotation mark", 430, 175, 100, 20)
 	GUICtrlSetState($checkquotes, $GUI_UNCHECKED)
 	$CheckUnicode = GUICtrlCreateCheckbox("Unicode", 430, 195, 60, 20)
-	GUICtrlSetState($CheckUnicode, $GUI_UNCHECKED)
+	GUICtrlSetState($CheckUnicode, $GUI_CHECKED)
 	$CheckCsvSplit = GUICtrlCreateCheckbox("split csv", 430, 215, 60, 20)
 	GUICtrlSetState($CheckCsvSplit, $GUI_UNCHECKED)
 
@@ -367,10 +367,10 @@ Func _ExtractSystemfile()
 	EndIf
 
 	If $CheckUnicode = 1 Then
-		$EncodingWhenOpen = 2+128
+		$EncodingWhenOpen = BitOR($FO_OVERWRITE, $FO_UTF8)
 		_DebugOut("UNICODE configured")
 	Else
-		$EncodingWhenOpen = 2
+		$EncodingWhenOpen = BitOR($FO_OVERWRITE, $FO_ANSI)
 		_DebugOut("ANSI configured")
 	EndIf
 
@@ -4052,6 +4052,14 @@ Func _GetInputParams()
 		EndIf
 	Else
 		$DateTimeFormat = 6
+	EndIf
+
+	If StringLen($CheckUnicode) > 0 Then
+		If $CheckUnicode <> 0 Then
+			$CheckUnicode = 1
+		EndIf
+	Else
+		$CheckUnicode = 1
 	EndIf
 EndFunc
 
