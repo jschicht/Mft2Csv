@@ -1,5 +1,10 @@
 Mft2Csv changelog
 
+v2.0.0.51
+Fixed bugs that could cause an application crash during the resolving of paths.
+Fixed a bug that would cause an application crash with extremely large $MFT's.
+Fixed a bug that would cause failed parsing when input was an extracted $MFT file and record 0 contained a non-resident attribute list. A warning is now instead printed about the decode of record 0 being incomplete.
+
 v2.0.0.50
 Fixed a bug that caused an app crash on certain corrupt input.
 Changes to log2timeline output.

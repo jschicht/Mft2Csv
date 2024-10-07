@@ -8,7 +8,7 @@
 #AutoIt3Wrapper_Change2CUI=y
 #AutoIt3Wrapper_Res_Comment=Decode $MFT and write to CSV
 #AutoIt3Wrapper_Res_Description=Decode $MFT and write to CSV
-#AutoIt3Wrapper_Res_Fileversion=2.0.0.50
+#AutoIt3Wrapper_Res_Fileversion=2.0.0.51
 #AutoIt3Wrapper_Res_requestedExecutionLevel=asInvoker
 #AutoIt3Wrapper_AU3Check_Parameters=-w 3 -w 5
 #AutoIt3Wrapper_Run_Au3Stripper=y
@@ -26,7 +26,7 @@
 #include <ComboConstants.au3>
 #include <FontConstants.au3>
 
-Global $Progversion = "Mft2Csv 2.0.0.50"
+Global $Progversion = "Mft2Csv 2.0.0.51"
 
 ; parts by Ddan, trancexxx, Ascend4nt & others
 
@@ -86,7 +86,7 @@ Global $DateTimeFormat, $ExampleTimestampVal = "01CD74B3150770B8", $TimestampPre
 Global $tDelta = _WinTime_GetUTCToLocalFileTimeDelta()
 
 Global $TargetDrive = "", $MFT_Record_Size, $BytesPerCluster, $MFT_Offset, $MFT_Size, $sInput
-Global $FileTree[1][4], $hDisk, $rBuffer, $NonResidentFlag, $zPath, $sBuffer, $Total, $MFTTree[1]
+Global $FileTree[1], $hDisk, $rBuffer, $NonResidentFlag, $zPath, $sBuffer, $Total, $MFTTree[1]
 Global $ADS_Name, $Reparse = ""
 Global $DT_Clusters, $DT_InitSize, $DataRun, $DT_DataRun
 Global $IsCompressed, $IsSparse, $logfile = 0, $subst, $active = False
@@ -506,7 +506,7 @@ Func _ExtractSystemfile()
 		_DoFileTree()                        ;creates folder structure
 	Else
 		$Total = ($MftFileSize/$MFT_Record_Size)
-		Redim $FileTree[$Total][4]
+		Redim $FileTree[$Total]
 	EndIf
 
 	$ProgressFileName = GUICtrlCreateLabel("", 20,  495, 660, 20, $DT_END_ELLIPSIS)
@@ -518,7 +518,7 @@ Func _ExtractSystemfile()
 
 	For $i = 0 To UBound($FileTree)-1	;note $i is mft reference number
 		$CurrentProgress = $i
-		$Files = $Filetree[$i][0]
+		$Files = $Filetree[$i]
 		If StringInStr($Files, "/") > 0 Then ;MFT record was split across 2 dataruns
 			_DebugOut("Ref " & $i & " has its record split across 2 dataruns")
 			$SplitRecordPart1 = StringMid($Files, StringInStr($Files, "/")+1)
@@ -669,7 +669,10 @@ Func _DoFileTree()
 	Local $nBytes, $ParentRef, $FileRef, $BaseRef, $testvar=0, $TmpRecord, $MFTClustersToKeep=0, $DoKeepCluster=0, $Subtr, $PartOfAttrList=0, $ArrSize
 	Local $FileSeq, $ParentSeq, $active, $BaseSeq
 	$Total = Int($MFT_Size/$MFT_Record_Size)
-	Global $FileTree[$Total][4] ;FilePath, active, refseq, parentrefseq,
+	Global $FileTree[$Total] ;FilePath
+;	Local $FileTree1[$Total] ;active
+	Local $FileTree2[$Total] ;refseq
+	Local $FileTree3[$Total] ;parentrefseq
 	Global $MFTTree[$Total]
 	$ref = -1
 	$Pos=0
@@ -745,9 +748,9 @@ Func _DoFileTree()
 			$FileSeq = Dec(_SwapEndian(StringMid($record,35,4)))
 			$BaseRef = Dec(_SwapEndian(StringMid($record,67,12)),2)
 			$BaseSeq = Dec(_SwapEndian(StringMid($record,79,4)))
-			If $BaseRef <> 0 Or StringInStr($MftAttrListString,','&$FileRef&',') Then ;The baseRef can be 0 for the extra records when $MFT contains $ATTRIBUTE_LIST
+			If $active = 1 And ($BaseRef <> 0 Or StringInStr($MftAttrListString,','&$FileRef&',')) Then ;The baseRef can be 0 for the extra records when $MFT contains $ATTRIBUTE_LIST
 				_DebugOut("Ref " & $FileRef & " has baseref " & $BaseRef)
-				$FileTree[$FileRef][0] = $Pos + $i      ;may contain data attribute
+				$FileTree[$FileRef] = $Pos + $i      ;may contain data attribute
 				$FileRef = $BaseRef
 				$FileSeq = $BaseSeq
 				$PartOfAttrList=1
@@ -756,9 +759,10 @@ Func _DoFileTree()
 			EndIf
 			$Offset = (Dec(StringMid($record,43,2))*2)+3
 			$FileName = ""
+
 			While 1     ;only want names and reparse
 				$Type = Dec(StringMid($record,$Offset,8),2)
-				If $Type > Dec("C0000000",2) Then ExitLoop   ;no more names or reparse
+				If $Type > Dec("30000000",2) Then ExitLoop   ;no more names or reparse
 				$Size = Dec(_SwapEndian(StringMid($record,$Offset+8,8)),2)
 				If $Type = Dec("30000000",2) Then
 					$attr = StringMid($record,$Offset,$Size*2)
@@ -769,58 +773,44 @@ Func _DoFileTree()
 						$NameLength = Dec(StringMid($attr,177,2))
 						$FileName = StringMid($attr,181,$NameLength*4)
 						$FileName = BinaryToString("0x"&$FileName,2)
-						$FileTree[$FileRef][0] &= "**" & $ParentRef & "*" & $FileName
-						$FileTree[$FileRef][3] &= "**" & $ParentRef & "-" & $ParentSeq
+						$FileTree[$FileRef] &= "**" & $ParentRef & "*" & $FileName
+						$FileTree3[$FileRef] &= "**" & $ParentRef & "-" & $ParentSeq
 					EndIf
-				ElseIf $Type = Dec("C0000000",2) Then
-					#cs
-					$tag = StringMid($record,$Offset + 48,8)
-					$PrintNameOffset = Dec(_SwapEndian(StringMid($record,$Offset+72,4)),2)
-					$PrintNameLength = Dec(_SwapEndian(StringMid($record,$Offset+76,4)),2)
-					If $tag = "030000A0" Then	;JUNCTION
-						$PrintName = BinaryToString("0x"&StringMid($record, $Offset+80+$PrintNameOffset*2, $PrintNameLength*2),2)
-					ElseIf $tag = "0C0000A0" Then	;SYMLINKD
-						$PrintName = BinaryToString("0x"&StringMid($record, $Offset+80+$PrintNameOffset*2+8, $PrintNameLength*2),2)
-					Else
-						_DebugOut($ref & " Unhandled Reparse Tag: " & $tag, $record)
-					EndIf
-					$Reparse &= $ref & "*" & $tag & "*" & $PrintName & "?"
-					#ce
 				EndIf
 				$Offset += $Size*2
 			WEnd
-			If Not BitAND($Flags,Dec("0200")) And $PartOfAttrList=0 And $FileTree[$FileRef][0] <> "" Then
-				$FileTree[$FileRef][0] &= "?" & ($Pos + $i)     ;file also add FilePointer
+			If Not BitAND($Flags,Dec("0200")) And $PartOfAttrList=0 And $FileTree[$FileRef] <> "" Then
+				$FileTree[$FileRef] &= "?" & ($Pos + $i)     ;file also add FilePointer
 			EndIf
-			If StringInStr($FileTree[$FileRef][0], "**") = 1 Then $FileTree[$FileRef][0] = StringTrimLeft($FileTree[$FileRef][0],2)    ;remove leading **
-			If StringInStr($FileTree[$FileRef][3], "**") = 1 Then $FileTree[$FileRef][3] = StringTrimLeft($FileTree[$FileRef][3],2)    ;remove leading **
-			If $i = 0 And $DoKeepCluster Then $FileTree[$FileRef][0] &= "/" & $ArrSize  ;Mark record as being split across 2 runs
-			$FileTree[$FileRef][1] = $active
-			If $active = 0 Then $FileSeq -= 1 ; to get correct mapping with deleted items
-			$FileTree[$FileRef][2] = $FileRef & "-" & $FileSeq
-
+			If StringInStr($FileTree[$FileRef], "**") = 1 Then $FileTree[$FileRef] = StringTrimLeft($FileTree[$FileRef],2)    ;remove leading **
+			If StringInStr($FileTree3[$FileRef], "**") = 1 Then $FileTree3[$FileRef] = StringTrimLeft($FileTree3[$FileRef],2)    ;remove leading **
+			If $i = 0 And $DoKeepCluster Then $FileTree[$FileRef] &= "/" & $ArrSize  ;Mark record as being split across 2 runs
+;			$FileTree1[$FileRef] = $active
+			If $active = 0 And $PartOfAttrList = 0 Then $FileSeq -= 1 ; to get correct mapping with deleted items
+			$FileTree2[$FileRef] = $FileRef & "-" & $FileSeq
 		Next
 	Next
 	AdlibUnRegister()
 	If UBound($FileTree) > 5 Then
-		$FileTree[5][0] = ":"
+		$FileTree[5] = ":"
 	EndIf
+
 	$begin = TimerInit()
 	AdlibRegister("_FolderStrucProgress", 1000)
 	Local $RefSeq1, $RefSeq2, $RefSeq1s
 	For $i = 0 to UBound($FileTree)-1
 		$CurrentProgress = $i
-		If StringInStr($FileTree[$i][0], "**") = 0 Then
-			$RefSeq1 = $FileTree[$i][3]
-			While StringInStr($FileTree[$i][0], "*") > 0   ;single file
-				$Parent=StringMid($Filetree[$i][0], 1, StringInStr($FileTree[$i][0], "*")-1)
-				$RefSeq2 = $FileTree[$Parent][2]
+		If StringInStr($FileTree[$i], "**") = 0 Then
+			$RefSeq1 = $FileTree3[$i]
+			While StringInStr($FileTree[$i], "*") > 0   ;single file
+				$Parent = StringMid($Filetree[$i], 1, StringInStr($FileTree[$i], "*")-1)
 				If $Parent < UBound($Filetree) Then
-					If StringInStr($Filetree[$Parent][0],"?")=0 And (StringInStr($Filetree[$Parent][0],"*")>0 Or StringInStr($Filetree[$Parent][0],":")>0) And $RefSeq1 = $RefSeq2 Then
-						$FileTree[$i][0] = StringReplace($FileTree[$i][0], $Parent & "*", $Filetree[$Parent][0] & "\")
-						$RefSeq1 = $FileTree[$Parent][3]
+					$RefSeq2 = $FileTree2[$Parent]
+					If StringInStr($Filetree[$Parent],"?")=0 And (StringInStr($Filetree[$Parent],"*")>0 Or StringInStr($Filetree[$Parent],":")>0) And $RefSeq1 = $RefSeq2 Then
+						$FileTree[$i] = StringReplace($FileTree[$i], $Parent & "*", $Filetree[$Parent] & "\")
+						$RefSeq1 = $FileTree3[$Parent]
 					Else
-						$FileTree[$i][0] = StringReplace($FileTree[$i][0], $Parent & "*", $Filetree[5][0] & "\ORPHAN\")
+						$FileTree[$i] = StringReplace($FileTree[$i], $Parent & "*", $Filetree[5] & "\ORPHAN\")
 					EndIf
 				Else
 					_DebugOut("Error: $Parent out of bounds: " & $Parent)
@@ -828,20 +818,24 @@ Func _DoFileTree()
 				EndIf
 			WEnd
 		Else
-			$Names = StringSplit($FileTree[$i][0], "**",3)     ;hard links
+			$Names = StringSplit($FileTree[$i], "**",3)     ;hard links
 			$str = ""
-			$RefSeq1s = StringSplit($FileTree[$i][3], "**",3)
+			$RefSeq1s = StringSplit($FileTree3[$i], "**",3)
 			For $n = 0 to UBound($Names) - 1
-				$RefSeq1 = $RefSeq1s[$n]
+				If $n < UBound($RefSeq1s) Then
+					$RefSeq1 = $RefSeq1s[$n]
+				Else
+					$RefSeq1 = ""
+				EndIf
 				While StringInStr($Names[$n], "*") > 0
 					$Parent=StringMid($Names[$n], 1, StringInStr($Names[$n], "*")-1)
-					$RefSeq2 = $FileTree[$Parent][2]
 					If $Parent < UBound($Filetree) Then
-						If StringInStr($Filetree[$Parent][0],"?")=0 And (StringInStr($Filetree[$Parent][0],"*")>0 Or StringInStr($Filetree[$Parent][0],":")>0) And $RefSeq1 = $RefSeq2 Then
-							$Names[$n] = StringReplace($Names[$n], $Parent & "*", $Filetree[$Parent][0] & "\")
-							$RefSeq1 = $FileTree[$Parent][3]
+						$RefSeq2 = $FileTree2[$Parent]
+						If StringInStr($Filetree[$Parent],"?")=0 And (StringInStr($Filetree[$Parent],"*")>0 Or StringInStr($Filetree[$Parent],":")>0) And $RefSeq1 = $RefSeq2 Then
+							$Names[$n] = StringReplace($Names[$n], $Parent & "*", $Filetree[$Parent] & "\")
+							$RefSeq1 = $FileTree3[$Parent]
 						Else
-							$Names[$n] = StringReplace($Names[$n], $Parent & "*", $Filetree[5][0] & "\ORPHAN\")
+							$Names[$n] = StringReplace($Names[$n], $Parent & "*", $Filetree[5] & "\ORPHAN\")
 						EndIf
 					Else
 						_DebugOut("Error: $Parent out of bounds: " & $Parent)
@@ -850,18 +844,18 @@ Func _DoFileTree()
 				WEnd
 				$str &= $Names[$n] & "*"
 			Next
-			$FileTree[$i][0] = StringTrimRight($str,1)
+			$FileTree[$i] = StringTrimRight($str,1)
 		EndIf
 	Next
 	If UBound($FileTree) > 5 Then
-		$FileTree[5][0] &= "\"
+		$FileTree[5] &= "\"
 	EndIf
 	AdlibUnRegister()
 	For $i = 0 To UBound($FileTree) - 1
-		If StringInStr($FileTree[$i][0], "*") = 0 Then
+		If StringInStr($FileTree[$i], "*") = 0 Then
 			ContinueLoop
 		EndIf
-		$myarr = StringSplit($FileTree[$i][0], "*")
+		$myarr = StringSplit($FileTree[$i], "*")
 		_ArrayDelete($myarr, 0)
 		_ArraySort($myarr, 0)
 		$testvar = ""
@@ -873,43 +867,50 @@ Func _DoFileTree()
 			EndIf
 		Next
 		;_DebugOut("Sorted: " & $testvar)
-		$FileTree[$i][0] = StringTrimRight($testvar, 1)
+		$FileTree[$i] = StringTrimRight($testvar, 1)
 	Next
 EndFunc
 
 Func _DecodeAttrList($FileRef, $AttrList)
-   Local $offset, $nBytes, $List = "", $str = ""
-   If StringMid($AttrList, 17, 2) = "00" Then		;attribute list is resident in AttrList
-	  $offset = Dec(_SwapEndian(StringMid($AttrList, 41, 4)))
-	  $List = StringMid($AttrList, $offset*2+1)		;gets list when resident
-   Else			;attribute list is found from data run in $AttrList
-	  $size = Dec(_SwapEndian(StringMid($AttrList, $offset*2 + 97, 16)))
-	  $offset = ($offset + Dec(_SwapEndian(StringMid($AttrList, $offset*2 + 65, 4))))*2
-	  $DataRun = StringMid($AttrList, $offset+1, StringLen($AttrList)-$offset)
-	  Global $RUN_VCN[1], $RUN_Clusters[1]		;redim arrays
-	  _ExtractDataRuns()
-	  $cBuffer = DllStructCreate("byte[" & $BytesPerCluster & "]")
-	  For $r = 1 To Ubound($RUN_VCN)-1
-		 _WinAPI_SetFilePointerEx($hDisk, $ImageOffset+$RUN_VCN[$r]*$BytesPerCluster, $FILE_BEGIN)
-		 For $i = 1 To $RUN_Clusters[$r]
-			_WinAPI_ReadFile($hDisk, DllStructGetPtr($cBuffer), $BytesPerCluster, $nBytes)
-			$List &= StringTrimLeft(DllStructGetData($cBuffer, 1),2)
-		 Next
-	  Next
-	  $List = StringMid($List, 1, $size*2)
-   EndIf
-   If StringMid($List, 1, 8) <> "10000000" Then Return ""		;bad signature
-   $offset = 0
-   While StringLen($list) > $offset*2
-	  $ref = Dec(_SwapEndian(StringMid($List, $offset*2 + 33, 8)))
-	  If $ref <> $FileRef Then		;new attribute
-		 If Not StringInStr($str, $ref) Then $str &= $ref & "-"
-	  EndIf
-	  $offset += Dec(_SwapEndian(StringMid($List, $offset*2 + 9, 4)))
-   WEnd
-   $AttrQ[0] = ""
-   If $str <> "" Then $AttrQ = StringSplit(StringTrimRight($str,1), "-")
-   Return $List
+	Local $offset, $nBytes, $List = "", $str = ""
+	If StringMid($AttrList, 17, 2) = "00" Then		;attribute list is resident in AttrList
+		$offset = Dec(_SwapEndian(StringMid($AttrList, 41, 4)))
+		$List = StringMid($AttrList, $offset*2+1)		;gets list when resident
+	Else			;attribute list is found from data run in $AttrList
+		If $FileRef = 0 And $IsMftFile Then
+			_DebugOut("WARNING: A non-resident $ATTRIBUTE_LIST is not possible to resolve with an extracted $MFT file. The decoded record for $MFT itself will thus be incomplete.")
+			Return
+		EndIf
+		$size = Dec(_SwapEndian(StringMid($AttrList, $offset*2 + 97, 16)))
+		$offset = ($offset + Dec(_SwapEndian(StringMid($AttrList, $offset*2 + 65, 4))))*2
+		$DataRun = StringMid($AttrList, $offset+1, StringLen($AttrList)-$offset)
+		Global $RUN_VCN[1], $RUN_Clusters[1]		;redim arrays
+		_ExtractDataRuns()
+		$cBuffer = DllStructCreate("byte[" & $BytesPerCluster & "]")
+		For $r = 1 To Ubound($RUN_VCN)-1
+			_WinAPI_SetFilePointerEx($hDisk, $ImageOffset+$RUN_VCN[$r]*$BytesPerCluster, $FILE_BEGIN)
+			For $i = 1 To $RUN_Clusters[$r]
+				If Not _WinAPI_ReadFile($hDisk, DllStructGetPtr($cBuffer), $BytesPerCluster, $nBytes) Then
+					_DebugOut("_DecodeAttrList(): Error in ReadFile: " & _WinAPI_GetLastErrorMessage())
+					Exit(1)
+				EndIf
+				$List &= StringTrimLeft(DllStructGetData($cBuffer, 1),2)
+			Next
+		Next
+		$List = StringMid($List, 1, $size*2)
+	EndIf
+	If StringMid($List, 1, 8) <> "10000000" Then Return ""		;bad signature
+	$offset = 0
+	While StringLen($list) > $offset*2
+		$ref = Dec(_SwapEndian(StringMid($List, $offset*2 + 33, 8)))
+		If $ref <> $FileRef Then		;new attribute
+			If Not StringInStr($str, $ref) Then $str &= $ref & "-"
+		EndIf
+		$offset += Dec(_SwapEndian(StringMid($List, $offset*2 + 9, 4)))
+	WEnd
+	$AttrQ[0] = ""
+	If $str <> "" Then $AttrQ = StringSplit(StringTrimRight($str,1), "-")
+	Return $List
 EndFunc
 
 Func _StripMftRecord($record, $FileRef)
@@ -1006,7 +1007,9 @@ Func _DecodeMFTRecord0($record, $FileRef)      ;produces DataQ
 		If $Type = 32 Then
 			$AttrList = StringMid($record,$AttributeOffset,$AttributeSize*2)	;whole attribute
 			$AttrList = _DecodeAttrList($FileRef, $AttrList)		;produces $AttrQ - extra record list
-			If $AttrList = "" Then
+			If $FileRef = 0 And $IsMftFile And $AttrList = "" Then
+				; We accept this although the decode for record 0 will be incomplete
+			ElseIf $AttrList = "" Then
 				_DebugOut($FileRef & " Bad Attribute List signature", $record)
 				Return ""
 			Else
@@ -1070,11 +1073,11 @@ Func _DecodeMFTRecord($record, $FileRef)      ;produces DataQ
 				If $AttrQ[0] = "" Then ContinueLoop		;no new records
 				$str = ""
 				For $i = 1 To $AttrQ[0]
-					If Not IsNumber($FileTree[$AttrQ[$i]][0]) Then
+					If Not IsNumber($FileTree[$AttrQ[$i]]) Then
 						_DebugOut($FileRef & " Overwritten extra record (" & $AttrQ[$i] & ")", $record)
 						Return ""
 					EndIf
-					$rec = _GetAttrListMFTRecord($FileTree[$AttrQ[$i]][0])
+					$rec = _GetAttrListMFTRecord($FileTree[$AttrQ[$i]])
 					If StringMid($rec,3,8) <> $RecordSignature Then
 						_DebugOut($FileRef & " Bad signature for extra record", $record)
 						Return ""
